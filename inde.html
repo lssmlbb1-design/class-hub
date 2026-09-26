@@ -1,443 +1,170 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Class Hub</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-  :root {
-    --bg: var(--tg-theme-bg-color, #ffffff);
-    --text: var(--tg-theme-text-color, #1c1c1e);
-    --hint: var(--tg-theme-hint-color, #8e8e93);
-    --link: var(--tg-theme-link-color, #2481cc);
-    --button: var(--tg-theme-button-color, #2481cc);
-    --button-text: var(--tg-theme-button-text-color, #ffffff);
-    --secondary-bg: var(--tg-theme-secondary-bg-color, #f2f2f7);
-    --section-bg: var(--tg-theme-section-bg-color, #ffffff);
-    --separator: rgba(120, 120, 128, 0.2);
-    box-sizing: border-box;
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  * { box-sizing: border-box; }
-  html, body {
-    height: 100%;
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  body { display: flex; flex-direction: column; }
-
-  header.topbar {
-    padding: 14px 16px 10px;
-    position: sticky;
-    top: env(safe-area-inset-top, 0px);
-    background: var(--bg);
-    z-index: 5;
-  }
-  header.topbar h1 {
-    font-size: 20px;
-    margin: 0 0 2px;
-  }
-  header.topbar p {
-    margin: 0;
-    font-size: 13px;
-    color: var(--hint);
-  }
-
-  nav.tabs {
-    display: flex;
-    gap: 6px;
-    padding: 0 12px 10px;
-    position: sticky;
-    top: 56px;
-    background: var(--bg);
-    z-index: 5;
-    overflow-x: auto;
-  }
-  nav.tabs button {
-    flex: 1;
-    border: none;
-    background: var(--secondary-bg);
-    color: var(--text);
-    padding: 9px 8px;
-    border-radius: 10px;
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background 0.15s ease;
-  }
-  nav.tabs button.active {
-    background: var(--button);
-    color: var(--button-text);
-  }
-
-  main {
-    flex: 1;
-    overflow-y: auto;
-    padding: 4px 12px 24px;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .view { display: none; }
-  .view.active { display: block; }
-
-  .search-bar {
-    position: relative;
-    margin: 6px 0 12px;
-  }
-  .search-bar input {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--separator);
-    background: var(--section-bg);
-    color: var(--text);
-    font-size: 14px;
-    outline: none;
-  }
-  .search-bar input::placeholder { color: var(--hint); }
-
-  .card {
-    background: var(--section-bg);
-    border: 1px solid var(--separator);
-    border-radius: 12px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-  }
-  .card .row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 8px;
-  }
-  .card .title {
-    font-size: 15px;
-    font-weight: 600;
-  }
-  .card .meta {
-    font-size: 12px;
-    color: var(--hint);
-    margin-top: 2px;
-  }
-  .badge {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 999px;
-    background: var(--secondary-bg);
-    color: var(--link);
-    white-space: nowrap;
-  }
-  .card a.link-btn {
-    display: inline-block;
-    margin-top: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--button-text);
-    background: var(--button);
-    padding: 7px 12px;
-    border-radius: 8px;
-    text-decoration: none;
-  }
-
-  .group-line {
-    font-size: 13px;
-    margin-top: 4px;
-  }
-  .group-line span.label {
-    color: var(--hint);
-    margin-right: 4px;
-  }
-
-  .empty-state {
-    text-align: center;
-    color: var(--hint);
-    font-size: 13px;
-    padding: 40px 10px;
-  }
-
-  /* Skeleton loader */
-  .skeleton-card {
-    background: var(--section-bg);
-    border: 1px solid var(--separator);
-    border-radius: 12px;
-    padding: 14px;
-    margin-bottom: 10px;
-  }
-  .sk-line {
-    height: 12px;
-    border-radius: 6px;
-    background: linear-gradient(90deg, var(--secondary-bg) 25%, var(--separator) 37%, var(--secondary-bg) 63%);
-    background-size: 400% 100%;
-    animation: shimmer 1.4s ease infinite;
-    margin-bottom: 8px;
-  }
-  .sk-line.w60 { width: 60%; }
-  .sk-line.w40 { width: 40%; }
-  .sk-line.w80 { width: 80%; }
-  @keyframes shimmer {
-    0% { background-position: 100% 0; }
-    100% { background-position: 0 0; }
-  }
-
-  .error-banner {
-    background: #ffe5e5;
-    color: #a30000;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 13px;
-    margin-bottom: 12px;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --separator: rgba(120, 120, 128, 0.35);
-    }
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Class Hub Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-slate-900 text-white min-h-screen pb-16">
 
-<header class="topbar">
-  <h1>📚 Class Hub</h1>
-  <p id="subtitle">Deadlines, groups &amp; syllabi — one tap away</p>
-</header>
+  <!-- Header -->
+  <header class="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center sticky top-0 z-10">
+    <h1 class="text-lg font-bold text-sky-400">🎓 Class Hub</h1>
+    <span id="user-name" class="text-xs text-slate-400">Студент</span>
+  </header>
 
-<nav class="tabs">
-  <button class="tab-btn active" data-view="schedule">📅 Deadlines</button>
-  <button class="tab-btn" data-view="groups">👥 My Team</button>
-  <button class="tab-btn" data-view="syllabus">📄 Syllabi</button>
-</nav>
+  <!-- Navigation Tabs -->
+  <nav class="flex justify-around bg-slate-800/80 backdrop-blur border-b border-slate-700 text-sm">
+    <button onclick="switchTab('schedule')" id="tab-schedule" class="py-3 px-4 border-b-2 border-sky-400 font-semibold text-sky-400">Расписание</button>
+    <button onclick="switchTab('groups')" id="tab-groups" class="py-3 px-4 border-b-2 border-transparent text-slate-400">Группы</button>
+    <button onclick="switchTab('syllabus')" id="tab-syllabus" class="py-3 px-4 border-b-2 border-transparent text-slate-400">Силлобусы</button>
+  </nav>
 
-<main>
-  <div id="error-slot"></div>
-
-  <section id="view-schedule" class="view active">
-    <div id="schedule-list"><div class="skeleton-loader"></div></div>
-  </section>
-
-  <section id="view-groups" class="view">
-    <div class="search-bar">
-      <input type="text" id="group-search" placeholder="Search by name or @username…" />
+  <!-- Main Container -->
+  <main class="p-4 max-w-md mx-auto">
+    <!-- Loader -->
+    <div id="loader" class="text-center py-10">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-sky-400 border-t-transparent"></div>
+      <p class="text-slate-400 mt-2 text-sm">Загрузка данных из таблицы...</p>
     </div>
-    <div id="groups-list"><div class="skeleton-loader"></div></div>
-  </section>
 
-  <section id="view-syllabus" class="view">
-    <div id="syllabus-list"><div class="skeleton-loader"></div></div>
-  </section>
-</main>
+    <!-- Section: Schedule -->
+    <section id="sec-schedule" class="space-y-3">
+      <!-- Динамически заполняется из JS -->
+    </section>
 
-<script>
-(function () {
-  // ---- CONFIG ----------------------------------------------------------
-  const API_URL = '[https://script.google.com/macros/s/AKfycbzNjMx0uo7q4nh9KPOQgk68EieQbBYTmZVvOouIM9E21ried7oDQy167Nt3tGbXDO8oKw/exec](https://script.google.com/macros/s/AKfycbzNjMx0uo7q4nh9KPOQgk68EieQbBYTmZVvOouIM9E21ried7oDQy167Nt3tGbXDO8oKw/exec)PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE'; // ends with /exec
+    <!-- Section: Groups -->
+    <section id="sec-groups" class="hidden space-y-3">
+      <input type="text" id="search-group" oninput="filterGroups()" placeholder="🔍 Введи фамилию или группу..." 
+             class="w-full p-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm focus:outline-none focus:border-sky-400 mb-3">
+      <div id="groups-list" class="space-y-2"></div>
+    </section>
 
-  // ---- Telegram WebApp setup --------------------------------------------
-  const tg = window.Telegram && window.Telegram.WebApp;
-  if (tg) {
-    tg.ready();
-    tg.expand();
-    if (tg.setHeaderColor) { try { tg.setHeaderColor('bg_color'); } catch (e) {} }
-  }
+    <!-- Section: Syllabus -->
+    <section id="sec-syllabus" class="hidden space-y-3">
+      <div id="syllabus-list" class="space-y-2"></div>
+    </section>
+  </main>
 
-  const currentUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  <!-- JS Logic -->
+  <script>
+    // ⚠️ ВСТАВЬ СЮДА СВОЮ ССЫЛКУ /exec ИЗ GOOGLE APPS SCRIPT
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzNjMx0uo7q4nh9KPOQgk68EieQbBYTmZVvOouIM9E21ried7oDQy167Nt3tGbXDO8oKw/exec';
 
-  // ---- State -------------------------------------------------------------
-  let state = { schedule: [], groups: [], syllabus: [] };
+    let appData = { schedule: [], groups: [], syllabus: [] };
 
-  // ---- Tabs ---------------------------------------------------------------
-  const tabButtons = document.querySelectorAll('.tab-btn');
-  const views = document.querySelectorAll('.view');
-
-  tabButtons.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      tabButtons.forEach(function (b) { b.classList.remove('active'); });
-      views.forEach(function (v) { v.classList.remove('active'); });
-      btn.classList.add('active');
-      document.getElementById('view-' + btn.dataset.view).classList.add('active');
-      updateMainButton(btn.dataset.view);
-    });
-  });
-
-  // ---- MainButton / BackButton --------------------------------------------
-  function updateMainButton(view) {
-    if (!tg) return;
-    tg.BackButton.hide();
-    if (view === 'schedule') {
-      tg.MainButton.setText('Refresh data');
-      tg.MainButton.show();
-    } else {
-      tg.MainButton.hide();
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.initDataUnsafe?.user) {
+        document.getElementById('user-name').innerText = tg.initDataUnsafe.user.first_name;
+      }
     }
-  }
-  if (tg) {
-    tg.MainButton.onClick(function () { loadData(true); });
-    updateMainButton('schedule');
-  }
 
-  // ---- Skeletons -----------------------------------------------------------
-  function skeletonHTML(count) {
-    let html = '';
-    for (let i = 0; i < count; i++) {
-      html += '<div class="skeleton-card">' +
-              '<div class="sk-line w60"></div>' +
-              '<div class="sk-line w40"></div>' +
-              '<div class="sk-line w80"></div>' +
-              '</div>';
-    }
-    return html;
-  }
-  ['schedule-list', 'groups-list', 'syllabus-list'].forEach(function (id) {
-    document.getElementById(id).innerHTML = skeletonHTML(3);
-  });
-
-  // ---- Fetch ----------------------------------------------------------------
-  function loadData(isRefresh) {
-    document.getElementById('error-slot').innerHTML = '';
-    fetch(API_URL + '?action=getAll')
-      .then(function (res) {
-        if (!res.ok) throw new Error('Network error: ' + res.status);
-        return res.json();
-      })
-      .then(function (json) {
-        if (!json.ok) throw new Error(json.error || 'Unknown API error');
-        state.schedule = json.data.schedule || [];
-        state.groups = json.data.groups || [];
-        state.syllabus = json.data.syllabus || [];
-        renderSchedule();
-        renderGroups();
-        renderSyllabus();
-        if (isRefresh && tg && tg.HapticFeedback) {
-          tg.HapticFeedback.notificationOccurred('success');
+    async function loadData() {
+      try {
+        const res = await fetch(`${API_URL}?action=getAll`);
+        const json = await res.json();
+        
+        if (json.ok) {
+          appData = json.data;
+          renderSchedule();
+          renderGroups();
+          renderSyllabus();
         }
-      })
-      .catch(function (err) {
-        document.getElementById('error-slot').innerHTML =
-          '<div class="error-banner">Couldn\'t load data: ' + escapeHTML(err.message) + '</div>';
-        ['schedule-list', 'groups-list', 'syllabus-list'].forEach(function (id) {
-          document.getElementById(id).innerHTML = '<div class="empty-state">No data available.</div>';
-        });
+      } catch (err) {
+        console.error('Ошибка загрузки данных:', err);
+      } finally {
+        document.getElementById('loader').classList.add('hidden');
+      }
+    }
+
+    function switchTab(tab) {
+      ['schedule', 'groups', 'syllabus'].forEach(t => {
+        document.getElementById(`sec-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).className = 'py-3 px-4 border-b-2 border-transparent text-slate-400';
       });
-  }
 
-  // ---- Renderers --------------------------------------------------------------
-  function renderSchedule() {
-    const list = document.getElementById('schedule-list');
-    if (!state.schedule.length) {
-      list.innerHTML = '<div class="empty-state">No deadlines posted yet 🎉</div>';
-      return;
-    }
-    const sorted = state.schedule.slice().sort(function (a, b) {
-      return new Date(a.Date) - new Date(b.Date);
-    });
-    list.innerHTML = sorted.map(function (item) {
-      const dateLabel = formatDate(item.Date);
-      const link = item.Link
-        ? '<a class="link-btn" href="' + escapeAttr(item.Link) + '" target="_blank">Open</a>'
-        : '';
-      return '<div class="card">' +
-        '<div class="row">' +
-          '<div class="title">' + escapeHTML(item.Subject || 'General') + '</div>' +
-          '<span class="badge">' + escapeHTML(item.Type || 'Task') + '</span>' +
-        '</div>' +
-        '<div class="meta">' + escapeHTML(item.Task || '') + '</div>' +
-        '<div class="meta">📆 ' + dateLabel + '</div>' +
-        link +
-      '</div>';
-    }).join('');
-  }
-
-  function renderGroups(filterText) {
-    const list = document.getElementById('groups-list');
-    let rows = state.groups;
-
-    if (!rows.length) {
-      list.innerHTML = '<div class="empty-state">No group data yet.</div>';
-      return;
+      document.getElementById(`sec-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-${tab}`).className = 'py-3 px-4 border-b-2 border-sky-400 font-semibold text-sky-400';
     }
 
-    if (filterText) {
-      const q = filterText.toLowerCase();
-      rows = rows.filter(function (r) {
-        return (String(r.Name || '').toLowerCase().indexOf(q) > -1) ||
-               (String(r.Username || '').toLowerCase().indexOf(q) > -1);
+    function renderSchedule() {
+      const container = document.getElementById('sec-schedule');
+      if (!appData.schedule || appData.schedule.length === 0) {
+        container.innerHTML = '<p class="text-center text-slate-500 py-4">Расписание пока пустое.</p>';
+        return;
+      }
+
+      container.innerHTML = appData.schedule.map(item => `
+        <div class="bg-slate-800 p-3.5 rounded-xl border border-slate-700/60 shadow-sm">
+          <div class="flex justify-between items-start mb-1">
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30">
+              ${item.Subject || item.Предмет || 'Предмет'}
+            </span>
+            <span class="text-xs text-slate-400">${item.Date ? String(item.Date).split('T')[0] : ''}</span>
+          </div>
+          <p class="text-sm font-medium mt-1 text-slate-200">${item.Task || item.Задание || 'Занятие'}</p>
+          <p class="text-xs text-slate-400 mt-1">📌 Тип: ${item.Type || item.Тип || 'Пара'}</p>
+        </div>
+      `).join('');
+    }
+
+    function renderGroups() {
+      const container = document.getElementById('groups-list');
+      if (!appData.groups || appData.groups.length === 0) {
+        container.innerHTML = '<p class="text-center text-slate-500 py-4">Данные по группам не найдены.</p>';
+        return;
+      }
+
+      container.innerHTML = appData.groups.map(item => `
+        <div class="bg-slate-800 p-3 rounded-lg border border-slate-700 text-sm flex justify-between items-center">
+          <div>
+            <div class="font-semibold text-slate-200">${item.Student || item.Студент || item.Subject || 'Студент'}</div>
+            <div class="text-xs text-slate-400">${item.Details || item.Детали || ''}</div>
+          </div>
+          <span class="text-xs font-bold px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            ${item.Group || item.Группа || 'Группа 1'}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function filterGroups() {
+      const query = document.getElementById('search-group').value.toLowerCase();
+      const cards = document.getElementById('groups-list').children;
+      Array.from(cards).forEach(card => {
+        const text = card.innerText.toLowerCase();
+        card.style.display = text.includes(query) ? 'flex' : 'none';
       });
     }
 
-    // Auto-highlight the current Telegram user, if their @username matches
-    if (currentUser && currentUser.username && !filterText) {
-      rows = rows.slice().sort(function (a, b) {
-        const aMatch = String(a.Username || '').replace('@', '').toLowerCase() === currentUser.username.toLowerCase();
-        const bMatch = String(b.Username || '').replace('@', '').toLowerCase() === currentUser.username.toLowerCase();
-        return (bMatch ? 1 : 0) - (aMatch ? 1 : 0);
-      });
+    function renderSyllabus() {
+      const container = document.getElementById('syllabus-list');
+      if (!appData.syllabus || appData.syllabus.length === 0) {
+        container.innerHTML = '<p class="text-center text-slate-500 py-4">Силлобусы пока не загружены.</p>';
+        return;
+      }
+
+      container.innerHTML = appData.syllabus.map(item => `
+        <div class="bg-slate-800 p-3.5 rounded-xl border border-slate-700 flex justify-between items-center">
+          <div>
+            <h4 class="font-semibold text-sm text-slate-200">${item.Subject || item.Предмет}</h4>
+            <p class="text-xs text-slate-400">${item.Instructor || item.Преподаватель || 'Преподаватель'}</p>
+          </div>
+          <a href="${item.Link || item.Ссылка || '#'}" target="_blank" 
+             class="px-3 py-1.5 bg-sky-500 text-xs font-medium rounded-lg hover:bg-sky-400 transition-colors">
+            Открыть 📄
+          </a>
+        </div>
+      `).join('');
     }
 
-    if (!rows.length) {
-      list.innerHTML = '<div class="empty-state">No matches found.</div>';
-      return;
-    }
-
-    list.innerHTML = rows.map(function (r) {
-      const isMe = currentUser && currentUser.username &&
-        String(r.Username || '').replace('@', '').toLowerCase() === currentUser.username.toLowerCase();
-      return '<div class="card" style="' + (isMe ? 'border-color:var(--button);' : '') + '">' +
-        '<div class="row">' +
-          '<div class="title">' + escapeHTML(r.Name || '') + '</div>' +
-          (isMe ? '<span class="badge">You</span>' : '') +
-        '</div>' +
-        '<div class="meta">' + escapeHTML(r.Username || '') + '</div>' +
-        '<div class="group-line"><span class="label">🇬🇧 English:</span>' + escapeHTML(r.EnglishGroup || '—') + '</div>' +
-        '<div class="group-line"><span class="label">🇰🇬 Kyrgyz:</span>' + escapeHTML(r.KyrgyzGroup || '—') + '</div>' +
-        '<div class="group-line"><span class="label">🧩 Project team:</span>' + escapeHTML(r.ProjectTeam || '—') + '</div>' +
-      '</div>';
-    }).join('');
-  }
-
-  function renderSyllabus() {
-    const list = document.getElementById('syllabus-list');
-    if (!state.syllabus.length) {
-      list.innerHTML = '<div class="empty-state">No syllabi posted yet.</div>';
-      return;
-    }
-    list.innerHTML = state.syllabus.map(function (s) {
-      const link = s.Link
-        ? '<a class="link-btn" href="' + escapeAttr(s.Link) + '" target="_blank">Open</a>'
-        : '';
-      return '<div class="card">' +
-        '<div class="title">' + escapeHTML(s.Subject || '') + '</div>' +
-        '<div class="meta">' + escapeHTML(s.Title || '') + '</div>' +
-        link +
-      '</div>';
-    }).join('');
-  }
-
-  // ---- Search ------------------------------------------------------------------
-  document.getElementById('group-search').addEventListener('input', function (e) {
-    renderGroups(e.target.value.trim());
-  });
-
-  // ---- Helpers ------------------------------------------------------------------
-  function formatDate(value) {
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return escapeHTML(String(value || ''));
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-  }
-  function escapeHTML(str) {
-    return String(str).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-  function escapeAttr(str) { return escapeHTML(str); }
-
-  // ---- Kick off ------------------------------------------------------------------
-  loadData(false);
-})();
-</script>
+    // Загрузка при старте
+    loadData();
+  </script>
 </body>
 </html>
