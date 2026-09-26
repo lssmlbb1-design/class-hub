@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
@@ -352,6 +352,221 @@
 
   loadData();
 })();
-</script>
+
+
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Class Hub Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .active-tab {
+      background: #38bdf8;
+      color: #0f172a;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.35);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col pb-6 select-none bg-slate-900 text-slate-100">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 glass-card px-4 py-3.5 flex justify-between items-center border-b border-slate-800">
+    <div class="flex items-center space-x-2.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center font-bold text-white shadow-lg shadow-sky-500/20 text-sm">
+        CH
+      </div>
+      <div>
+        <h1 class="text-base font-bold leading-none text-white tracking-tight">Class Hub</h1>
+        <span class="text-[11px] text-sky-400 font-medium">AUCA Student Space</span>
+      </div>
+    </div>
+    <div id="user-badge" class="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700/80 text-xs text-slate-300 font-medium flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span id="user-name">Студент</span>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <div class="p-3">
+    <nav class="grid grid-cols-3 gap-1 bg-slate-900/90 p-1 rounded-2xl border border-slate-800 text-xs font-semibold">
+      <button onclick="switchTab('schedule')" id="tab-schedule" class="py-2.5 rounded-xl transition-all duration-200 active-tab">📅 Расписание</button>
+      <button onclick="switchTab('groups')" id="tab-groups" class="py-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:text-slate-200">👥 Группы</button>
+      <button onclick="switchTab('syllabus')" id="tab-syllabus" class="py-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:text-slate-200">📚 Силлобусы</button>
+    </nav>
+  </div>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 px-3 space-y-3">
+
+    <!-- Loader -->
+    <div id="loader" class="flex flex-col items-center justify-center py-16 space-y-3">
+      <div class="w-9 h-9 border-3 border-sky-400 border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-xs text-slate-400 font-medium animate-pulse">Синхронизация с Google Sheets...</p>
+    </div>
+
+    <!-- Section 1: Schedule -->
+    <section id="sec-schedule" class="space-y-2.5">
+      <!-- Cards rendered here -->
+    </section>
+
+    <!-- Section 2: Groups -->
+    <section id="sec-groups" class="hidden space-y-3">
+      <div class="relative">
+        <input type="text" id="search-group" oninput="filterGroups()" placeholder="🔍 Поиск студента, предмета или подгруппы..." 
+               class="w-full pl-3.5 pr-4 py-2.5 rounded-xl bg-slate-800/90 border border-slate-700/80 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-400 transition-colors">
+      </div>
+      <div id="groups-list" class="space-y-2"></div>
+    </section>
+
+    <!-- Section 3: Syllabus -->
+    <section id="sec-syllabus" class="hidden space-y-2.5">
+      <div id="syllabus-list" class="space-y-2.5"></div>
+    </section>
+
+  </main>
+
+  <script>
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzNjMx0uo7q4nh9KPOQgk68EieQbBYTmZVvOouIM9E21ried7oDQy167Nt3tGbXDO8oKw/exec';
+
+    let appData = { schedule: [], groups: [], syllabus: [] };
+
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.initDataUnsafe?.user) {
+        document.getElementById('user-name').innerText = tg.initDataUnsafe.user.first_name;
+      }
+    }
+
+    async function loadData() {
+      try {
+        const res = await fetch(`${API_URL}?action=getAll`);
+        const json = await res.json();
+        
+        if (json.ok) {
+          appData = json.data;
+          renderSchedule();
+          renderGroups();
+          renderSyllabus();
+        }
+      } catch (err) {
+        console.error('Ошибка:', err);
+      } finally {
+        document.getElementById('loader').classList.add('hidden');
+      }
+    }
+
+    function switchTab(tab) {
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+      ['schedule', 'groups', 'syllabus'].forEach(t => {
+        document.getElementById(`sec-${t}`).classList.add('hidden');
+        const tabBtn = document.getElementById(`tab-${t}`);
+        tabBtn.className = 'py-2.5 rounded-xl transition-all duration-200 text-slate-400 hover:text-slate-200';
+      });
+
+      document.getElementById(`sec-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-${tab}`).className = 'py-2.5 rounded-xl transition-all duration-200 active-tab';
+    }
+
+    function renderSchedule() {
+      const container = document.getElementById('sec-schedule');
+      if (!appData.schedule || appData.schedule.length === 0) {
+        container.innerHTML = '<div class="text-center text-slate-500 py-10 text-xs">Заданий и расписания пока нет 🚀</div>';
+        return;
+      }
+
+      container.innerHTML = appData.schedule.map(item => `
+        <div class="glass-card p-3.5 rounded-2xl space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-[10px] font-bold tracking-wider uppercase px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30">
+              ${item.Subject || item.Предмет || 'Курс'}
+            </span>
+            <span class="text-[11px] text-slate-400 font-medium">
+              📅 ${item.Date ? String(item.Date).split('T')[0] : 'Скоро'}
+            </span>
+          </div>
+          <p class="text-xs font-medium text-slate-100 leading-snug">
+            ${item.Task || item.Задание || 'Занятие'}
+          </p>
+          <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-700/50">
+            <span>📌 ${item.Type || item.Тип || 'ДЗ / Семинар'}</span>
+            <span class="text-emerald-400 font-medium">Активно</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderGroups() {
+      const container = document.getElementById('groups-list');
+      if (!appData.groups || appData.groups.length === 0) {
+        container.innerHTML = '<div class="text-center text-slate-500 py-10 text-xs">Данные подгрупп не заполнены.</div>';
+        return;
+      }
+
+      container.innerHTML = appData.groups.map(item => `
+        <div class="glass-card p-3 rounded-xl flex justify-between items-center text-xs">
+          <div class="space-y-0.5">
+            <div class="font-semibold text-slate-200">${item.Student || item.Студент || item.Subject || 'Студент'}</div>
+            <div class="text-[11px] text-slate-400">${item.Details || item.Детали || 'Официальная подгруппа'}</div>
+          </div>
+          <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold text-[11px]">
+            ${item.Group || item.Группа || 'Группа A'}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function filterGroups() {
+      const query = document.getElementById('search-group').value.toLowerCase();
+      const cards = document.getElementById('groups-list').children;
+      Array.from(cards).forEach(card => {
+        card.style.display = card.innerText.toLowerCase().includes(query) ? 'flex' : 'none';
+      });
+    }
+
+    function renderSyllabus() {
+      const container = document.getElementById('syllabus-list');
+      if (!appData.syllabus || appData.syllabus.length === 0) {
+        container.innerHTML = '<div class="text-center text-slate-500 py-10 text-xs">Силлобусы не найдены.</div>';
+        return;
+      }
+
+      container.innerHTML = appData.syllabus.map(item => `
+        <div class="glass-card p-3.5 rounded-2xl flex justify-between items-center">
+          <div class="space-y-1">
+            <h4 class="font-bold text-xs text-slate-100">${item.Subject || item.Предмет}</h4>
+            <p class="text-[11px] text-slate-400">👤 ${item.Instructor || item.Преподаватель || 'Преподаватель'}</p>
+          </div>
+          <a href="${item.Link || item.Ссылка || '#'}" target="_blank" 
+             class="px-3.5 py-2 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-semibold text-[11px] rounded-xl shadow-lg shadow-sky-500/20 active:scale-95 transition-transform flex items-center gap-1">
+            <span>PDF</span> 📄
+          </a>
+        </div>
+      `).join('');
+    }
+
+    loadData();
+  </script>
 </body>
 </html>
+</script>
+</body>
+</html> -->
