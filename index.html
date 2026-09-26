@@ -74,6 +74,15 @@
     background: linear-gradient(90deg, #60A5FA, #34D399);
   }
 
+  .sort-btn {
+    transition: all 0.2s ease;
+  }
+  .sort-btn.active {
+    background-color: rgba(96, 165, 250, 0.2);
+    color: #60A5FA;
+    border-color: rgba(96, 165, 250, 0.4);
+  }
+
   button, a { -webkit-tap-highlight-color: transparent; }
   input:focus-visible, button:focus-visible, a:focus-visible {
     outline: 2px solid #60A5FA;
@@ -111,7 +120,7 @@
 
 <nav class="sticky top-[68px] z-20 px-4 pb-2" style="background: #0B1120;" role="tablist">
   <div class="flex gap-1 border-b border-white/10">
-    <button id="tab-schedule" data-view="schedule" aria-controls="view-schedule" class="tab-btn tab-underline active flex-1 py-2.5 text-[13px] font-semibold text-slate-100" role="tab" aria-selected="true">📅 Расписание</button>
+    <button id="tab-deadlines" data-view="deadlines" aria-controls="view-deadlines" class="tab-btn tab-underline active flex-1 py-2.5 text-[13px] font-semibold text-slate-100" role="tab" aria-selected="true">⏳ Дедлайны</button>
     <button id="tab-groups" data-view="groups" aria-controls="view-groups" class="tab-btn tab-underline flex-1 py-2.5 text-[13px] font-semibold text-slate-400" role="tab" aria-selected="false">👥 Группы & Проекты</button>
     <button id="tab-syllabus" data-view="syllabus" aria-controls="view-syllabus" class="tab-btn tab-underline flex-1 py-2.5 text-[13px] font-semibold text-slate-400" role="tab" aria-selected="false">📚 Силлабусы</button>
   </div>
@@ -120,10 +129,21 @@
 <main class="flex-1 px-4 pt-3 pb-8 overflow-y-auto">
   <div id="error-slot" role="alert"></div>
 
-  <section id="view-schedule" class="view fade-in" role="tabpanel" aria-labelledby="tab-schedule">
-    <div id="schedule-list" class="space-y-2.5"></div>
+  <!-- View: Deadlines -->
+  <section id="view-deadlines" class="view fade-in" role="tabpanel" aria-labelledby="tab-deadlines">
+    <!-- Сортировка -->
+    <div class="mb-3">
+      <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 font-semibold">Сортировка:</div>
+      <div class="flex gap-2 overflow-x-auto pb-1">
+        <button id="sort-date" data-sort="date" class="sort-btn active px-3 py-1.5 rounded-xl text-[12px] font-medium glass border border-white/10 shrink-0">📅 Ближайшие</button>
+        <button id="sort-credits" data-sort="credits" class="sort-btn px-3 py-1.5 rounded-xl text-[12px] font-medium glass border border-white/10 text-slate-400 shrink-0">🎓 По кредитам</button>
+        <button id="sort-points" data-sort="points" class="sort-btn px-3 py-1.5 rounded-xl text-[12px] font-medium glass border border-white/10 text-slate-400 shrink-0">⭐ По баллам</button>
+      </div>
+    </div>
+    <div id="deadlines-list" class="space-y-2.5"></div>
   </section>
 
+  <!-- View: Groups -->
   <section id="view-groups" class="view hidden" role="tabpanel" aria-labelledby="tab-groups">
     <div class="relative mb-3">
       <svg class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -136,6 +156,7 @@
     <div id="groups-list" class="space-y-2.5"></div>
   </section>
 
+  <!-- View: Syllabus -->
   <section id="view-syllabus" class="view hidden" role="tabpanel" aria-labelledby="tab-syllabus">
     <div id="syllabus-list" class="space-y-2.5"></div>
   </section>
@@ -143,7 +164,7 @@
 
 <script>
 (function () {
-  const API_URL = 'https://script.google.com/macros/s/AKfycbwSi3zpobjeL1i9KFXuS0jdpDYi7SLSWDAhGx7w6QVfBhkxezVQFsODOsVfJxKebgLJWw/exec';
+  const API_URL = '1ygTKJmW_9GWwPspc1RY2yJjvfI8WT5XsFf2NNZuAT_M';
 
   const tg = window.Telegram && window.Telegram.WebApp;
   if (tg) {
@@ -172,7 +193,7 @@
 
   const tabButtons = document.querySelectorAll('.tab-btn');
   const views = {
-    schedule: document.getElementById('view-schedule'),
+    deadlines: document.getElementById('view-deadlines'),
     groups: document.getElementById('view-groups'),
     syllabus: document.getElementById('view-syllabus')
   };
@@ -213,15 +234,32 @@
     '</div>';
   }
   function showSkeletons() {
-    ['schedule-list', 'groups-list', 'syllabus-list'].forEach(function (id) {
+    ['deadlines-list', 'groups-list', 'syllabus-list'].forEach(function (id) {
       document.getElementById(id).innerHTML = skeletonCard() + skeletonCard() + skeletonCard();
     });
   }
   showSkeletons();
 
   let state = { schedule: [], groups: [], projects: [], syllabus: [] };
+  let currentSort = 'date';
   let hasLoadedData = false;
   let requestInFlight = false;
+
+  // Кнопки сортировки
+  const sortBtns = document.querySelectorAll('.sort-btn');
+  sortBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      haptic('light');
+      sortBtns.forEach(function (b) {
+        b.classList.remove('active', 'text-slate-100');
+        b.classList.add('text-slate-400');
+      });
+      btn.classList.add('active', 'text-slate-100');
+      btn.classList.remove('text-slate-400');
+      currentSort = btn.dataset.sort;
+      renderDeadlines();
+    });
+  });
 
   function loadAll() {
     if (requestInFlight) return;
@@ -240,7 +278,7 @@
         state.schedule = Array.isArray(json.data.schedule) ? json.data.schedule : [];
         state.groups = Array.isArray(json.data.groups) ? json.data.groups : [];
         state.syllabus = Array.isArray(json.data.syllabus) ? json.data.syllabus : [];
-        renderSchedule();
+        renderDeadlines();
         renderSyllabus();
         hasLoadedData = true;
       })
@@ -248,7 +286,7 @@
         document.getElementById('error-slot').innerHTML =
           '<div class="glass rounded-xl p-3 mb-3 text-[13px] text-rose-300" style="border-color: rgba(251,113,133,0.25);">Не удалось загрузить данные: ' + escapeHTML(err.message || String(err)) + '</div>';
         if (!hasLoadedData) {
-          ['schedule-list', 'groups-list', 'syllabus-list'].forEach(function (id) {
+          ['deadlines-list', 'groups-list', 'syllabus-list'].forEach(function (id) {
             document.getElementById(id).innerHTML = emptyState('Нет данных.');
           });
         }
@@ -305,23 +343,42 @@
   }
 
   function typeBadge(type) {
-    const t = String(type || 'Задание').toLowerCase();
+    const t = String(type || 'Дедлайн').toLowerCase();
     const map = {
       'лекция': 'bg-blue-500/15 text-blue-300', 'lecture': 'bg-blue-500/15 text-blue-300',
       'дз': 'bg-amber-500/15 text-amber-300', 'homework': 'bg-amber-500/15 text-amber-300',
-      'дедлайн': 'bg-rose-500/15 text-rose-300', 'deadline': 'bg-rose-500/15 text-rose-300'
+      'дедлайн': 'bg-rose-500/15 text-rose-300', 'deadline': 'bg-rose-500/15 text-rose-300',
+      'экзамен': 'bg-purple-500/15 text-purple-300', 'проект': 'bg-emerald-500/15 text-emerald-300'
     };
     const cls = map[t] || 'bg-slate-500/15 text-slate-300';
-    return '<span class="text-[11px] font-semibold px-2 py-1 rounded-lg ' + cls + '">' + escapeHTML(type || 'Задание') + '</span>';
+    return '<span class="text-[11px] font-semibold px-2 py-1 rounded-lg ' + cls + '">' + escapeHTML(type || 'Дедлайн') + '</span>';
   }
 
-  function renderSchedule() {
-    const list = document.getElementById('schedule-list');
+  function renderDeadlines() {
+    const list = document.getElementById('deadlines-list');
     if (!state.schedule.length) { list.innerHTML = emptyState('Дедлайнов пока нет 🎉'); return; }
 
-    const sorted = state.schedule.slice().sort(function (a, b) {
-      return new Date(a.Date || a.date).getTime() - new Date(b.Date || b.date).getTime();
-    });
+    let sorted = state.schedule.slice();
+
+    // Логика трех видов сортировки
+    if (currentSort === 'date') {
+      sorted.sort(function (a, b) {
+        return new Date(a.Date || a.date).getTime() - new Date(b.Date || b.date).getTime();
+      });
+    } else if (currentSort === 'credits') {
+      sorted.sort(function (a, b) {
+        const cA = Number(a.Credits || a.credits || a.Кредиты || 0);
+        const cB = Number(b.Credits || b.credits || b.Кредиты || 0);
+        return cB - cA;
+      });
+    } else if (currentSort === 'points') {
+      sorted.sort(function (a, b) {
+        const pA = Number(a.Points || a.points || a.Баллы || 0);
+        const pB = Number(b.Points || b.points || b.Баллы || 0);
+        return pB - pA;
+      });
+    }
+
     list.innerHTML = sorted.map(function (item) {
       const dateLabel = formatDate(item.Date || item.date);
       const linkUrl = safeURL(item.Link || item.Ссылка);
@@ -329,6 +386,13 @@
       const subject = item.Subject || item.Предмет || 'Общее';
       const task = item.Task || item.Задание || 'Занятие';
       const type = item.Type || item.Тип;
+      
+      const credits = item.Credits || item.credits || item.Кредиты;
+      const points = item.Points || item.points || item.Баллы;
+
+      const creditsHtml = credits ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/20">🎓 ' + escapeHTML(credits) + ' кр.</span>' : '';
+      const pointsHtml = points ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20">⭐ ' + escapeHTML(points) + ' балл.</span>' : '';
+
       return '<div class="glass rounded-2xl p-4">' +
         '<div class="flex items-start justify-between gap-3">' +
           '<div class="min-w-0">' +
@@ -337,7 +401,11 @@
           '</div>' +
           typeBadge(type) +
         '</div>' +
-        '<div class="text-[12px] text-slate-500 mt-2.5">📆 ' + dateLabel + '</div>' +
+        '<div class="flex flex-wrap items-center gap-2 mt-3 text-[12px] text-slate-400">' +
+          '<span class="text-slate-300 font-medium">⏳ ' + dateLabel + '</span>' +
+          creditsHtml +
+          pointsHtml +
+        '</div>' +
         link +
       '</div>';
     }).join('');
