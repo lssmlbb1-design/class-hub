@@ -1,6 +1,297 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Class Hub</title>
+  <style>
+    :root {
+      --primary: #0088cc;
+      --bg: #f4f6f8;
+      --card-bg: #ffffff;
+      --text: #1a1a1a;
+      --text-muted: #666666;
+      --border: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 40px; }
+
+    header {
+      background: var(--card-bg);
+      padding: 16px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header h1 { font-size: 20px; color: var(--primary); }
+
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      background: var(--card-bg);
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+      border-radius: 20px;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    main { max-width: 600px; margin: 16px auto; padding: 0 16px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+      border: 1px solid var(--border);
+    }
+
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    
+    .badge {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      background: #e3f2fd;
+      color: #0d47a1;
+    }
+
+    .badge-capacity { background: #e8f5e9; color: #2e7d32; }
+    .badge-full { background: #ffebee; color: #c62828; }
+
+    .card-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .card-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
+
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .btn-link {
+      background: var(--primary);
+      color: #fff !important;
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    /* States */
+    .loading, .error, .empty {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .error { color: #d32f2f; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Class Hub</h1>
+  </header>
+
+  <nav>
+    <button class="tab-btn active" data-tab="deadlines">📅 Дедлайны</button>
+    <button class="tab-btn" data-tab="projects">👥 Проекты</button>
+    <button class="tab-btn" data-tab="groups">📚 Предметы</button>
+  </nav>
+
+  <main>
+    <section id="deadlines" class="tab-content active">
+      <div id="deadlines-container" class="loading">Загрузка данных...</div>
+    </section>
+
+    <section id="projects" class="tab-content">
+      <div id="projects-container" class="loading">Загрузка данных...</div>
+    </section>
+
+    <section id="groups" class="tab-content">
+      <div id="groups-container" class="loading">Загрузка данных...</div>
+    </section>
+  </main>
+
+  <script>
+    // ВАША АКТУАЛЬНАЯ ССЫЛКА НА GOOGLE APPS SCRIPT
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzLu1rrwQDBCzMzyW3XnFfFA1GsGWY715qEJ3_oe-MKwHl3t4NKWSiFFENyPHTblP2PgQ/exec';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setupTabs();
+      loadAllData();
+    });
+
+    // Переключение вкладок без повторных запросов
+    function setupTabs() {
+      const buttons = document.querySelectorAll('.tab-btn');
+      const contents = document.querySelectorAll('.tab-content');
+
+      buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.tab;
+
+          buttons.forEach(b => b.classList.remove('active'));
+          contents.forEach(c => c.classList.remove('active'));
+
+          btn.classList.add('active');
+          const activeContent = document.getElementById(target);
+          if (activeContent) activeContent.classList.add('active');
+        });
+      });
+    }
+
+    // Загрузка ВСЕХ данных за 1 быстрый запрос
+    async function loadAllData() {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // Тайм-аут 12 сек
+
+        const response = await fetch(`${API_URL}?action=getAll`, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        const result = await response.json();
+
+        if (!result.ok || !result.data) {
+          showError('Не удалось загрузить данные из таблицы.');
+          return;
+        }
+
+        renderDeadlines(result.data.deadlines || []);
+        renderProjects(result.data.projects || []);
+        renderGroups(result.data.groups || []);
+
+      } catch (err) {
+        console.error('Data load error:', err);
+        showError(err.name === 'AbortError' ? '⏱️ Сервер отвечает слишком долго. Попробуйте обновить.' : '❌ Ошибка сети при загрузке.');
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('deadlines-container').innerHTML = `<div class="error">${msg}</div>`;
+      document.getElementById('projects-container').innerHTML = `<div class="error">${msg}</div>`;
+      document.getElementById('groups-container').innerHTML = `<div class="error">${msg}</div>`;
+    }
+
+    // 1. Отрисовка дедлайнов
+    function renderDeadlines(items) {
+      const container = document.getElementById('deadlines-container');
+      const activeItems = items.filter(i => String(i.Status || '').toLowerCase() !== 'expired');
+
+      if (!activeItems.length) {
+        container.innerHTML = '<div class="empty">Актуальных дедлайнов нет 🎉</div>';
+        return;
+      }
+
+      container.innerHTML = activeItems.map(item => {
+        const link = item.Link || item.Telegram_Msg_Link || '';
+        return `
+          <div class="card">
+            <div class="card-header">
+              <span class="badge">${esc(item.Subject || 'Общее')}</span>
+              <span class="badge" style="background:#fff3e0; color:#e65100">${esc(item.Type || 'Дедлайн')}</span>
+            </div>
+            <div class="card-title">${esc(item.Task || item.Task_Description || 'Без названия')}</div>
+            <div class="card-footer">
+              <span>📅 <strong>${esc(item.Date || item.Deadline_Date || 'Дата не указана')}</strong></span>
+              ${link ? `<a href="${esc(link)}" target="_blank" class="btn-link">🔗 Задание</a>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 2. Отрисовка проектов
+    function renderProjects(items) {
+      const container = document.getElementById('projects-container');
+      const activeItems = items.filter(i => String(i.Status || '').toLowerCase() !== 'expired');
+
+      if (!activeItems.length) {
+        container.innerHTML = '<div class="empty">Список проектов пуст 🎉</div>';
+        return;
+      }
+
+      container.innerHTML = activeItems.map(item => {
+        const maxCap = Number(item.Max_Capacity || 0);
+        const curCount = Number(item.Current_Count || 0);
+        const members = item.Members ? String(item.Members).split(',').join(', ') : 'Пока нет участников';
+        const isFull = curCount >= maxCap && maxCap > 0;
+
+        return `
+          <div class="card">
+            <div class="card-header">
+              <span class="badge">${esc(item.Subject || 'Предмет')}</span>
+              <span class="badge ${isFull ? 'badge-full' : 'badge-capacity'}">
+                👥 ${curCount} / ${maxCap} мест
+              </span>
+            </div>
+            <div class="card-title">${esc(item.Project_Name || 'Без названия')}</div>
+            <div class="card-desc"><strong>Участники:</strong> ${esc(members)}</div>
+            <div class="card-footer">
+              <span>📅 Дедлайн: <strong>${esc(item.Deadline || 'Не указан')}</strong></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 3. Отрисовка предметов/групп
+    function renderGroups(items) {
+      const container = document.getElementById('groups-container');
+
+      if (!items.length) {
+        container.innerHTML = '<div class="empty">Предметы не найдены 🎉</div>';
+        return;
+      }
+
+      container.innerHTML = items.map(item => `
+        <div class="card">
+          <div class="card-title">${esc(item.Subject || 'Название предмета')}</div>
+          <div class="card-desc">👨‍🏫 Преподаватель: ${esc(item.Teacher || 'Не указан')}</div>
+          <div class="card-footer">
+            ${item.Drive_Link ? `<a href="${esc(item.Drive_Link)}" target="_blank" class="btn-link">📁 Google Drive</a>` : '<span></span>'}
+            ${item.Chat_Link ? `<a href="${esc(item.Chat_Link)}" target="_blank" class="btn-link">💬 Чат предмета</a>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function esc(str) {
+      return String(str || '').replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="ru">
+<head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0B1120" />
