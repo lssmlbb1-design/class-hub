@@ -10,7 +10,7 @@ const WEB_APP_TELEGRAM_LINK = 'https://lssmlbb1-design.github.io/class-hub/';
 const SPREADSHEET_ID = '1ygTKJmW_9GWwPspc1RY2yJjvfI8WT5XsFf2NNZuAT_M';
 
 // Your deployed /exec URL
-const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycby51h0xbq1yRl3vhwDVRiHs_uk_zbhJ2O_N0iQ0NpFD1UKu5Xs1baJglJUAL-EmTzBe7Q/exec';
+const WEBHOOK_URL = 'https://class-hub.nureldinmuhamedov010410.workers.dev/';
 
 // Optional shared secret
 const WEBHOOK_SECRET = '1234899384';
@@ -148,88 +148,74 @@ function jsonResponse(obj) {
 // doPost — Telegram Webhook Handler
 // ============================================================
 
+/**
+ * Обработчик всех входящих POST-запросов (Telegram Webhook + Сайт)
+ */
 function doPost(e) {
-  // Telegram ВСЕГДА должен получать 200 OK в формате JSON, 
-  // чтобы не возникало ошибки 302 Found
-  const responseOK = ContentService.createTextOutput(JSON.stringify({ ok: true }))
-    .setMimeType(ContentService.MimeType.JSON);
-
   try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return responseOK;
-    }
+    if (e && e.postData && e.postData.contents) {
+      const data = JSON.parse(e.postData.contents);
 
-    const data = JSON.parse(e.postData.contents);
-
-    // 1. Запрос на добавление проекта с веб-сайта
-    if (data.action === 'addProject') {
-      try {
+      if (data.action === 'addProject') {
         handleAddProject(data);
-      } catch (errProject) {
-        Logger.log('❌ Ошибка в handleAddProject: ' + errProject.toString());
-      }
-      return responseOK;
-    }
-
-    // 2. Инлайн-кнопки в Telegram (callback_query)
-    if (data.callback_query) {
-      try {
+      } else if (data.callback_query) {
         handleInviteCallback(data.callback_query);
-      } catch (errCallback) {
-        Logger.log('❌ Ошибка в handleInviteCallback: ' + errCallback.toString());
-      }
-    } 
-    // 3. Сообщения из чата Telegram (ВОТ ЗДЕСЬ ШЛА ОШИБКА)
-    else if (data.message) {
-      try {
+      } else if (data.message) {
         handleTextMessage(data.message);
-      } catch (errMessage) {
-        Logger.log('❌ Ошибка в handleTextMessage: ' + errMessage.toString());
       }
     }
-
-  } catch (globalErr) {
-    Logger.log('❌ Глобальная ошибка doPost: ' + globalErr.toString());
+  } catch (err) {
+    Logger.log('❌ Ошибка в doPost: ' + err.toString());
   }
 
-  // Гарантированный возврат JSON
-  return responseOK;
+  // Обязательно возвращаем ContentService с пустым объектом {} и типом JSON
+  return ContentService.createTextOutput("{}")
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Установка Вебхука с очисткой зависших сообщений
+ */
+function setupWebhook() {
+  const url = WEBHOOK_URL.trim();
+  
+  // 1. Сбрасываем старый вебхук и удаляем застрявшие очереди (drop_pending_updates)
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/deleteWebhook?drop_pending_updates=true');
+  
+  // 2. Регистрируем корректный URL
+  const telegramApiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook?url=' + encodeURIComponent(url);
+  const response = UrlFetchApp.fetch(telegramApiUrl);
+  
+  Logger.log('Результат установки: ' + response.getContentText());
+}
+
+/**
+ * Проверка статуса Вебхука
+ */
+function checkWebhookInfo() {
+  const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/getWebhookInfo');
+  Logger.log('Webhook info: ' + response.getContentText());
 }
 
 // ============================================================
 // Text Message Handler (with admin commands)
 // ============================================================
 
-function handleTextMessage(msg) {
-  const text = msg.text.trim();
-  const chatId = msg.chat.id;
-  const threadId = msg.message_thread_id || null;
-  const messageId = msg.message_id;
+function handleTextMessage(message) {
+  const chatId = message.chat.id;
+  const text = message.text || '';
 
-  // Обработка admin команд, начинающихся с '='
-  if (text.startsWith('=')) {
-    handleAdminCommand(text, chatId, threadId, messageId);
-    return;
-  }
+  // Тестовая эхо-отправка для проверки связи
+  const payload = {
+    chat_id: chatId,
+    text: "✅ Связь есть! Получено сообщение: " + text
+  };
 
-  // Реакция на команду /start
-  if (text === '/start' || text === '/help') {
-    sendTelegramMessage(chatId, threadId, 
-      '👋 Привет! Я бот Class Hub.\n\nЗайди на наш сайт, чтобы посмотреть актуальные дедлайны, проекты и расписание:',
-      [[{ text: '📱 Открыть Class Hub', url: WEB_APP_TELEGRAM_LINK }]]
-    );
-    return;
-  }
-
-  // Реакция на ключевые слова
-  const lowerText = text.toLowerCase();
-  if (lowerText.includes('дедлайн') || lowerText.includes('проект') || lowerText.includes('домашка') || lowerText.includes('сдать')) {
-    sendTelegramMessage(chatId, threadId, 
-      '📅 Все актуальные дедлайны и проекты доступны на сайте Class Hub!',
-      [[{ text: '🔗 Перейти к дедлайнам', url: WEB_APP_TELEGRAM_LINK }]]
-    );
-    return;
-  }
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload)
+  });
 }
 
 // ============================================================
@@ -548,18 +534,7 @@ function answerCallback(callbackQueryId, text, showAlert) {
 // Webhook Setup
 // ============================================================
 
-function setupWebhook() {
-  const url = WEBHOOK_URL.trim();
-  
-  // 1. Сбрасываем старый вебхук и удаляем застрявшие сообщения
-  UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/deleteWebhook?drop_pending_updates=true');
-  
-  // 2. Регистрируем корректный URL
-  const telegramApiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook?url=' + encodeURIComponent(url);
-  const response = UrlFetchApp.fetch(telegramApiUrl);
-  
-  Logger.log('Результат установки: ' + response.getContentText());
-}
+
 
 function deleteWebhook() {
   const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/deleteWebhook', {
@@ -569,13 +544,7 @@ function deleteWebhook() {
   Logger.log('Webhook deleted: ' + response.getContentText());
 }
 
-function checkWebhookInfo() {
-  const response = UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/getWebhookInfo', {
-    method: 'get',
-    muteHttpExceptions: true
-  });
-  Logger.log('Webhook info: ' + response.getContentText());
-}
+
 
 // ============================================================
 // Utility Functions
