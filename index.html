@@ -516,7 +516,7 @@
       return;
     }
 
-    list.innerHTML = rows.map(function (project) {
+    container.innerHTML = activeProjects.map(project => {
       const subject = project.subject || project.Subject || 'Предмет';
       const name = project.name || project.Project_Name || 'Без темы';
       const deadline = project.deadline || project.Deadline || '';
@@ -525,6 +525,7 @@
       const telegramLink = project.telegramLink || project.Telegram_Msg_Link || '';
       const members = Array.isArray(project.members) ? project.members : [];
       const isFull = maxCap > 0 && curCount >= maxCap;
+      const activeProjects = projects.filter(p => p.Status !== 'Expired' && p.Status !== 'Archived');
 
       const badge = isFull
         ? '<span class="text-[12px] font-bold px-2 py-1 rounded-lg bg-rose-600 text-white">МЕСТ НЕТ</span>'
