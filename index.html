@@ -491,75 +491,66 @@
     }).join('');
   }
 
-  function renderProjects(filterText) {
-    const list = document.getElementById('groups-list');
-    let rows = Array.isArray(state.projects) ? state.projects : [];
+// Отрисовка карточек проектов на сайте
+function renderProjects(projects) {
+  const container = document.getElementById('projects-container');
+  if (!container) return;
 
-    if (!rows.length) {
-      list.innerHTML = emptyState('Проектов пока нет.');
-      return;
-    }
-
-    if (filterText) {
-      const q = filterText.toLowerCase();
-      rows = rows.filter(function (project) {
-        const haystack = [project.subject, project.name, project.Subject, project.Project_Name]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        return haystack.includes(q);
-      });
-    }
-
-    if (!rows.length) {
-      list.innerHTML = emptyState('Совпадений не найдено.');
-      return;
-    }
-
-    container.innerHTML = activeProjects.map(project => {
-      const subject = project.subject || project.Subject || 'Предмет';
-      const name = project.name || project.Project_Name || 'Без темы';
-      const deadline = project.deadline || project.Deadline || '';
-      const maxCap = Number(project.maxCapacity || project.Max_Capacity || 0);
-      const curCount = Number(project.currentCount || project.Current_Count || 0);
-      const telegramLink = project.telegramLink || project.Telegram_Msg_Link || '';
-      const members = Array.isArray(project.members) ? project.members : [];
-      const isFull = maxCap > 0 && curCount >= maxCap;
-      const activeProjects = projects.filter(p => p.Status !== 'Expired' && p.Status !== 'Archived');
-
-      const badge = isFull
-        ? '<span class="text-[12px] font-bold px-2 py-1 rounded-lg bg-rose-600 text-white">МЕСТ НЕТ</span>'
-        : '<span class="text-[12px] font-semibold px-2 py-1 rounded-lg bg-emerald-600/15 text-emerald-300">' + escapeHTML(curCount + ' / ' + maxCap) + '</span>';
-
-      const tgBtn = telegramLink
-        ? '<a href="' + escapeAttr(telegramLink) + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-[13px] font-semibold px-3 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition">🔗 Группа</a>'
-        : '';
-
-      const membersList = members.length
-        ? '<ul class="list-none m-0 p-0 space-y-1">' + members.map(function (m) {
-            return '<li class="text-[13px] text-slate-200">• ' + escapeHTML(m) + '</li>';
-          }).join('') + '</ul>'
-        : '<div class="text-[13px] text-slate-400">Пока никто не записался</div>';
-
-      return '<div class="glass rounded-2xl p-4">' +
-        '<div class="flex items-start justify-between gap-3">' +
-          '<div class="min-w-0">' +
-            '<div class="text-[14.5px] font-bold truncate">' + escapeHTML(subject) + '</div>' +
-          '</div>' +
-          badge +
-        '</div>' +
-        '<div class="mt-3 space-y-1">' +
-          '<div class="text-[13px] font-semibold text-slate-100">' + escapeHTML(name) + '</div>' +
-          (deadline ? '<div class="text-[12.5px] text-slate-500">⏳ ' + escapeHTML(formatDate(deadline)) + '</div>' : '') +
-        '</div>' +
-        (tgBtn ? '<div class="mt-3">' + tgBtn + '</div>' : '') +
-        '<div class="mt-3 pt-3 border-t border-white/5">' +
-          '<div class="text-[12px] text-slate-400 mb-2">👥 Участники:</div>' +
-          membersList +
-        '</div>' +
-      '</div>';
-    }).join('');
+  if (!projects || projects.length === 0) {
+    container.innerHTML = '<div class="empty">Проектов пока нет 🎉</div>';
+    return;
   }
+
+  // Фильтруем просроченные проекты
+  const activeProjects = projects.filter(p => p.Status !== 'Expired' && p.Status !== 'Archived');
+
+  container.innerHTML = activeProjects.map(item => {
+    const maxCap = item.Max_Capacity || 0;
+    const curCount = item.Current_Count || 0;
+    const members = item.Members ? item.Members.split(',').join(', ') : 'Пока нет участников';
+    const isFull = curCount >= maxCap;
+
+    return `
+      <div class="project-card ${isFull ? 'full' : ''}">
+        <div class="card-header">
+          <span class="badge-subject">${escapeHtml(item.Subject || 'Предмет не указан')}</span>
+          <span class="badge-capacity ${isFull ? 'full-badge' : ''}">
+            👥 ${curCount} / ${maxCap} мест
+          </span>
+        </div>
+        
+        <h3 class="project-title">${escapeHtml(item.Project_Name || 'Без названия')}</h3>
+        
+        <div class="project-members">
+          <strong>Участники:</strong>
+          <p>${escapeHtml(members)}</p>
+        </div>
+
+        <div class="card-footer">
+          <span>📅 Дедлайн: <strong>${escapeHtml(item.Deadline || 'Не указан')}</strong></span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Отрисовка предметов (с названиями, баллами и кредитами)
+function renderGroups(groups) {
+  const container = document.getElementById('groups-container');
+  if (!container) return;
+
+  container.innerHTML = groups.map(item => `
+    <div class="subject-card">
+      <h3>${escapeHtml(item.Subject || 'Название предмета')}</h3>
+      <p>👨‍🏫 Преподаватель: ${escapeHtml(item.Teacher || 'Не указан')}</p>
+      <div class="subject-meta">
+        <span>🏆 Баллы: ${escapeHtml(item.Points || '100')}</span>
+        <span>💳 Кредиты: ${escapeHtml(item.Credits || '3')}</span>
+      </div>
+      ${item.Drive_Link ? `<a href="${escapeHtml(item.Drive_Link)}" target="_blank" class="link-btn">📁 Материалы (Drive)</a>` : ''}
+    </div>
+  `).join('');
+}
 
   function renderSyllabus() {
     const list = document.getElementById('syllabus-list');
