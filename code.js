@@ -10,7 +10,7 @@ const WEB_APP_TELEGRAM_LINK = 'https://lssmlbb1-design.github.io/class-hub/';
 const SPREADSHEET_ID = '1ygTKJmW_9GWwPspc1RY2yJjvfI8WT5XsFf2NNZuAT_M';
 
 // Your deployed /exec URL
-const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxwvJdHq7pDG6YGRs8Z_2yyeyCOUW7RLJEyevZEWE-KE-TDZCI3mU5tdqMGPQUR7ucR/exec';
+const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxAax1YT_NhP4Vmeyu1mpZyw_0xj0XToSERkN9Gew4ZymAa-s24KvvNm6rZoT8unAl76g/exec';
 
 // Optional shared secret
 const WEBHOOK_SECRET = '1234899384';
@@ -146,38 +146,42 @@ function jsonResponse(obj) {
 // ============================================================
 
 function doPost(e) {
-  const responseOK = ContentService.createTextOutput('OK').setMimeType(ContentService.MimeType.TEXT);
-  
+  // Telegram ОБЯЗАН сразу получить 200 OK в формате JSON, 
+  // чтобы у него не возникало ошибки 302 Found
+  const output = ContentService.createTextOutput(JSON.stringify({ ok: true }))
+    .setMimeType(ContentService.MimeType.JSON);
+
   try {
-    if (!e || !e.postData || !e.postData.contents) return responseOK;
-
-    // Проверка безопасности: валидация токена
-    if (WEBHOOK_SECRET && e.parameter && e.parameter.token !== WEBHOOK_SECRET) {
-      Logger.log('Invalid webhook token');
-      return responseOK;
+    if (!e || !e.postData || !e.postData.contents) {
+      return output;
     }
 
-    const update = JSON.parse(e.postData.contents);
-    
-    // Обработка обычных сообщений
-    const msg = update.message || update.edited_message;
-    if (msg && msg.text && !msg.from.is_bot) {
-      handleTextMessage(msg);
-      return responseOK;
+    const data = JSON.parse(e.postData.contents);
+
+    // 1. Обработка кнопок из Telegram
+    if (data.callback_query) {
+      try {
+        handleInviteCallback(data.callback_query);
+      } catch (cbErr) {
+        Logger.log('❌ Ошибка в handleInviteCallback: ' + cbErr.toString());
+      }
+    } 
+    // 2. Обработка сообщений из чата
+    else if (data.message) {
+      try {
+        handleTextMessage(data.message);
+      } catch (msgErr) {
+        Logger.log('❌ Ошибка в handleTextMessage: ' + msgErr.toString());
+      }
     }
 
-    // Обработка нажатий на Inline кнопки
-    const cq = update.callback_query;
-    if (cq && cq.data) {
-      handleCallbackQuery(cq);
-      return responseOK;
-    }
-
-  } catch (err) {
-    Logger.log('doPost error: ' + err.toString());
+  } catch (globalErr) {
+    Logger.log('❌ Ошибка парсинга doPost: ' + globalErr.toString());
   }
 
-  return responseOK;
+  // Всегда возвращаем валидный JSON!
+  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+  .setMimeType(ContentService.MimeType.JSON);
 }
 
 // ============================================================
@@ -533,18 +537,17 @@ function answerCallback(callbackQueryId, text, showAlert) {
 // ============================================================
 
 function setupWebhook() {
-  // Берём ссылку напрямую из константы WEBHOOK_URL
-  const webAppUrl = WEBHOOK_URL;
+  // Берём прямую чистую ссылку на Deployment
+  const webAppUrl = 'https://script.google.com/macros/s/AKfycbxAax1YT_NhP4Vmeyu1mpZyw_0xj0XToSERkN9Gew4ZymAa-s24KvvNm6rZoT8unAl76g/exec';
   
-  if (!webAppUrl || webAppUrl.indexOf('/exec') === -1 || webAppUrl.includes('ВАША_СКОПИРОВАННАЯ_ССЫЛКА')) {
-    Logger.log('ОШИБКА: Укажите корректную ссылку /exec в переменной WEBHOOK_URL вверху файла!');
-    return;
-  }
-
-  const telegramApiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook?url=' + encodeURIComponent(webAppUrl) + (WEBHOOK_SECRET ? '?token=' + encodeURIComponent(WEBHOOK_SECRET) : '');
+  // 1. Сбрасываем старый зависший вебхук
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/deleteWebhook?drop_pending_updates=true');
+  
+  // 2. Регистрируем чистый URL без секретных токенов в URL
+  const telegramApiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook?url=' + encodeURIComponent(webAppUrl);
   
   const response = UrlFetchApp.fetch(telegramApiUrl);
-  Logger.log('Результат привязки вебхука: ' + response.getContentText());
+  Logger.log('Результат установки: ' + response.getContentText());
 }
 
 function deleteWebhook() {
@@ -915,7 +918,60 @@ function removeProjectFromFormChoices(projectName) {
 
 
 
+// ID вашей Google Формы команд (вставьте свой скопированный ID!)
+const TEAM_FORM_ID = '1PCasYaKY3YepLZrwjBA272-kUZa4bDlVGThxP4mZ1b4';
 
+// Точное название вопроса с выпадающим списком в вашей форме
+const PROJECT_QUESTION_TITLE = 'Выберите проект'; 
+
+/**
+ * Автоматически обновляет выпадающий список проектов в Google Форме
+ */
+function updateFormProjectOptions() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const projSheet = ss.getSheetByName('Projects');
+    if (!projSheet) return;
+
+    const data = projSheet.getDataRange().getValues();
+    if (data.length < 2) return;
+
+    // Собираем название только тех проектов, у которых Status === 'Active'
+    // и где есть свободные места (Current_Count < Max_Capacity)
+    const activeProjects = [];
+    for (let i = 1; i < data.length; i++) {
+      const name = String(data[i][1]).trim();
+      const maxCap = Number(data[i][3]) || 0;
+      const curCount = Number(data[i][4]) || 0;
+      const status = String(data[i][7] || 'Active').trim();
+
+      if (name && status === 'Active' && curCount < maxCap) {
+        activeProjects.push(name);
+      }
+    }
+
+    // Открываем Google Форму
+    const form = FormApp.openById(TEAM_FORM_ID);
+    const items = form.getItems();
+
+    // Ищем вопрос типа "Выпадающий список" (List) по заголовку
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].getTitle() === PROJECT_QUESTION_TITLE) {
+        const listItem = items[i].asListItem();
+        
+        if (activeProjects.length > 0) {
+          listItem.setChoiceValues(activeProjects);
+        } else {
+          listItem.setChoiceValues(['Нет доступных проектов']);
+        }
+        Logger.log('✅ Выпадающий список формы успешно обновлен: ' + activeProjects.join(', '));
+        break;
+      }
+    }
+  } catch (err) {
+    Logger.log('❌ Ошибка обновления формы: ' + err);
+  }
+}
 
 
 
