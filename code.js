@@ -10,7 +10,7 @@ const WEB_APP_TELEGRAM_LINK = 'https://lssmlbb1-design.github.io/class-hub/';
 const SPREADSHEET_ID = '1ygTKJmW_9GWwPspc1RY2yJjvfI8WT5XsFf2NNZuAT_M';
 
 // Your deployed /exec URL
-const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzvsZtUmFA2ht_AwXTqShWZqwuN_l-acb5bU8WCG5poymUXezFuMOwSGx85tXaCAWyOKA/exec';
+const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycby51h0xbq1yRl3vhwDVRiHs_uk_zbhJ2O_N0iQ0NpFD1UKu5Xs1baJglJUAL-EmTzBe7Q/exec';
 
 // Optional shared secret
 const WEBHOOK_SECRET = '1234899384';
@@ -141,39 +141,58 @@ function jsonResponse(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+
+
+
 // ============================================================
 // doPost — Telegram Webhook Handler
 // ============================================================
 
 function doPost(e) {
-  // ТЕЛЕГРАМ ТРЕБУЕТ STRICT { ok: true }
+  // Telegram ВСЕГДА должен получать 200 OK в формате JSON, 
+  // чтобы не возникало ошибки 302 Found
   const responseOK = ContentService.createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
 
   try {
-    if (!e || !e.postData || !e.postData.contents) return responseOK;
-
-    const data = JSON.parse(e.postData.contents);
-
-    // 1. Форма создания проекта с сайта
-    if (data.action === 'addProject') {
-      handleAddProject(data);
+    if (!e || !e.postData || !e.postData.contents) {
       return responseOK;
     }
 
-    // 2. Нажатие инлайн-кнопок в Telegram
-    if (data.callback_query) {
-      handleInviteCallback(data.callback_query);
-    } 
-    // 3. Сообщения в чате/группе Telegram
-    else if (data.message) {
-      handleTextMessage(data.message);
+    const data = JSON.parse(e.postData.contents);
+
+    // 1. Запрос на добавление проекта с веб-сайта
+    if (data.action === 'addProject') {
+      try {
+        handleAddProject(data);
+      } catch (errProject) {
+        Logger.log('❌ Ошибка в handleAddProject: ' + errProject.toString());
+      }
+      return responseOK;
     }
 
-  } catch (err) {
-    Logger.log('❌ doPost Error: ' + err.toString());
+    // 2. Инлайн-кнопки в Telegram (callback_query)
+    if (data.callback_query) {
+      try {
+        handleInviteCallback(data.callback_query);
+      } catch (errCallback) {
+        Logger.log('❌ Ошибка в handleInviteCallback: ' + errCallback.toString());
+      }
+    } 
+    // 3. Сообщения из чата Telegram (ВОТ ЗДЕСЬ ШЛА ОШИБКА)
+    else if (data.message) {
+      try {
+        handleTextMessage(data.message);
+      } catch (errMessage) {
+        Logger.log('❌ Ошибка в handleTextMessage: ' + errMessage.toString());
+      }
+    }
+
+  } catch (globalErr) {
+    Logger.log('❌ Глобальная ошибка doPost: ' + globalErr.toString());
   }
 
+  // Гарантированный возврат JSON
   return responseOK;
 }
 
@@ -964,7 +983,3 @@ function updateFormProjectOptions() {
     Logger.log('❌ Ошибка обновления формы: ' + err);
   }
 }
-
-
-
-
