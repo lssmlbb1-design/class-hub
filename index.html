@@ -1,145 +1,176 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0B1120" />
-<title>Class Hub — учебный центр</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-        colors: { base: '#0B1120', panel: '#111A2E' },
-        keyframes: {
-          pulseDot: {
-            '0%, 100%': { boxShadow: '0 0 0 0 rgba(52, 211, 153, 0.55)' },
-            '70%': { boxShadow: '0 0 0 6px rgba(52, 211, 153, 0)' },
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B1120" />
+  <title>Class Hub — учебный центр</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: { base: '#0B1120', panel: '#111A2E' },
+          keyframes: {
+            pulseDot: {
+              '0%, 100%': { boxShadow: '0 0 0 0 rgba(52, 211, 153, 0.55)' },
+              '70%': { boxShadow: '0 0 0 6px rgba(52, 211, 153, 0)' },
+            },
+            shimmer: {
+              '0%': { backgroundPosition: '100% 0' },
+              '100%': { backgroundPosition: '0 0' },
+            },
           },
-          shimmer: {
-            '0%': { backgroundPosition: '100% 0' },
-            '100%': { backgroundPosition: '0 0' },
+          animation: {
+            pulseDot: 'pulseDot 2s infinite',
+            shimmer: 'shimmer 1.6s ease infinite',
           },
-        },
-        animation: {
-          pulseDot: 'pulseDot 2s infinite',
-          shimmer: 'shimmer 1.6s ease infinite',
         },
       },
-    },
-  };
-</script>
-<style>
-  :root {
-    box-sizing: border-box;
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; background: #0B1120; }
-  body { font-family: 'Inter', system-ui, sans-serif; }
+    };
+  </script>
+  <style>
+    :root {
+      box-sizing: border-box;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: #0B1120; }
+    body { font-family: 'Inter', system-ui, sans-serif; }
 
-  .glass {
-    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-  .glass-strong {
-    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.10);
-  }
+    .glass {
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .glass-strong {
+      background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
 
-  ::-webkit-scrollbar { display: none; }
-  * { scrollbar-width: none; }
+    ::-webkit-scrollbar { display: none; }
+    * { scrollbar-width: none; }
 
-  .skel {
-    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.10) 37%, rgba(255,255,255,0.05) 63%);
-    background-size: 400% 100%;
-  }
+    .skel {
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.10) 37%, rgba(255,255,255,0.05) 63%);
+      background-size: 400% 100%;
+    }
 
-  .tab-underline { position: relative; }
-  .tab-underline.active::after {
-    content: '';
-    position: absolute;
-    left: 14px; right: 14px; bottom: -1px;
-    height: 2px; border-radius: 2px;
-    background: linear-gradient(90deg, #60A5FA, #34D399);
-  }
-  .deadline-card {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+    .tab-underline { position: relative; }
+    .tab-underline.active::after {
+      content: '';
+      position: absolute;
+      left: 14px; right: 14px; bottom: -1px;
+      height: 2px; border-radius: 2px;
+      background: linear-gradient(90deg, #60A5FA, #34D399);
+    }
 
-.card-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #f0f0f0;
-}
+    .deadline-card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
 
-.task-link-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background-color: #0088cc; /* Цвет Telegram */
-  color: #ffffff !important;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  text-decoration: none;
-  transition: background-color 0.2s ease;
-}
+    .card-header {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
 
-.task-link-btn:hover {
-  background-color: #006699;
-}
-  .sort-btn {
-    transition: all 0.2s ease;
-  }
-  .sort-btn.active {
-    background-color: rgba(96, 165, 250, 0.2);
-    color: #60A5FA;
-    border-color: rgba(96, 165, 250, 0.4);
-  }
+    .badge-subject, .badge-type {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
 
-  button, a { -webkit-tap-highlight-color: transparent; }
-  input:focus-visible, button:focus-visible, a:focus-visible {
-    outline: 2px solid #60A5FA;
-    outline-offset: 2px;
-  }
+    .badge-subject {
+      background-color: #e3f2fd;
+      color: #1565c0;
+    }
 
-  .fade-in { animation: fadeIn 0.25s ease both; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .badge-type {
+      background-color: #f3e5f5;
+      color: #6a1b9a;
+    }
 
-  @media (prefers-reduced-motion: reduce) {
-    .animate-pulseDot, .animate-shimmer, .fade-in { animation: none !important; }
-  }
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #f0f0f0;
+    }
 
-  @media (prefers-color-scheme: light) {
-    html, body { background: #f6f8fa; color: #0b1120; }
-    .glass { background: linear-gradient(180deg, rgba(11,17,32,0.05), rgba(11,17,32,0.02)); border-color: rgba(11,17,32,0.08); }
-    .glass-strong { background: linear-gradient(180deg, rgba(11,17,32,0.08), rgba(11,17,32,0.04)); border-color: rgba(11,17,32,0.08); }
-  }
-</style>
+    .task-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: #0088cc;
+      color: #ffffff !important;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background-color 0.2s ease;
+    }
+
+    .task-link-btn:hover {
+      background-color: #006699;
+    }
+
+    .sort-btn {
+      transition: all 0.2s ease;
+    }
+    .sort-btn.active {
+      background-color: rgba(96, 165, 250, 0.2);
+      color: #60A5FA;
+      border-color: rgba(96, 165, 250, 0.4);
+    }
+
+    button, a { -webkit-tap-highlight-color: transparent; }
+    input:focus-visible, button:focus-visible, a:focus-visible {
+      outline: 2px solid #60A5FA;
+      outline-offset: 2px;
+    }
+
+    .fade-in { animation: fadeIn 0.25s ease both; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .view.hidden { display: none; }
+    .view { display: block; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .animate-pulseDot, .animate-shimmer, .fade-in { animation: none !important; }
+    }
+
+    @media (prefers-color-scheme: light) {
+      html, body { background: #f6f8fa; color: #0b1120; }
+      .glass { background: linear-gradient(180deg, rgba(11,17,32,0.05), rgba(11,17,32,0.02)); border-color: rgba(11,17,32,0.08); }
+      .glass-strong { background: linear-gradient(180deg, rgba(11,17,32,0.08), rgba(11,17,32,0.04)); border-color: rgba(11,17,32,0.08); }
+    }
+  </style>
 </head>
 <body class="text-slate-100 min-h-screen flex flex-col">
 
@@ -158,9 +189,9 @@
 
 <nav class="sticky top-[68px] z-20 px-4 pb-2" style="background: #0B1120;" role="tablist">
   <div class="flex gap-1 border-b border-white/10">
-    <button id="tab-deadlines" data-view="deadlines" aria-controls="view-deadlines" class="tab-btn tab-underline active flex-1 py-2.5 text-[13px] font-semibold text-slate-100" role="tab" aria-selected="true">⏳ Дедлайны</button>
-    <button id="tab-groups" data-view="groups" aria-controls="view-groups" class="tab-btn tab-underline flex-1 py-2.5 text-[13px] font-semibold text-slate-400" role="tab" aria-selected="false">👥 Группы & Проекты</button>
-    <button id="tab-syllabus" data-view="syllabus" aria-controls="view-syllabus" class="tab-btn tab-underline flex-1 py-2.5 text-[13px] font-semibold text-slate-400" role="tab" aria-selected="false">📚 Силлабусы</button>
+    <button id="tab-deadlines" data-view="deadlines" aria-controls="view-deadlines" class="tab-btn tab-underline active flex-1 py-2.5 text-[13px] font-semibold text-slate-100" role="tab" aria-selected="true">📋 Дедлайны</button>
+    <button id="tab-groups" data-view="groups" aria-controls="view-groups" class="tab-btn tab-underline flex-1 py-2.5 text-[13px] font-semibold text-slate-400" role="tab" aria-selected="false">👥 Проекты</button>
+    <button id="tab-syllabus" data-view="syllabus" aria-controls="view-syllabus" class="tab-btn tab-underline flex-1 py-2.5 text-[13px] font-semibold text-slate-400" role="tab" aria-selected="false">📚 Курсы</button>
   </div>
 </nav>
 
@@ -169,7 +200,6 @@
 
   <!-- View: Deadlines -->
   <section id="view-deadlines" class="view fade-in" role="tabpanel" aria-labelledby="tab-deadlines">
-    <!-- Сортировка -->
     <div class="mb-3">
       <div class="text-[11px] uppercase tracking-wider text-slate-400 mb-1.5 font-semibold">Сортировка:</div>
       <div class="flex gap-2 overflow-x-auto pb-1">
@@ -202,7 +232,7 @@
 
 <script>
 (function () {
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzLu1rrwQDBCzMzyW3XnFfFA1GsGWY715qEJ3_oe-MKwHl3t4NKWSiFFENyPHTblP2PgQ/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzaIw7-LTplafBKeNJyxdDKFn0Pzpt7ZX3x6nUvklBuz_v7L0o1O-PEFtN8aVmVqEo5mA/exec';
 
   const tg = window.Telegram && window.Telegram.WebApp;
   if (tg) {
@@ -220,6 +250,7 @@
     }
   }
 
+  // Personalization
   (function personalize() {
     const firstName = currentUser && currentUser.first_name;
     if (firstName) {
@@ -229,6 +260,7 @@
     }
   })();
 
+  // Tab Management
   const tabButtons = document.querySelectorAll('.tab-btn');
   const views = {
     deadlines: document.getElementById('view-deadlines'),
@@ -236,25 +268,40 @@
     syllabus: document.getElementById('view-syllabus')
   };
 
+  function switchTab(viewName) {
+    haptic('light');
+    tabButtons.forEach(function (b) {
+      b.classList.remove('active', 'text-slate-100');
+      b.classList.add('text-slate-400');
+      b.setAttribute('aria-selected', 'false');
+    });
+    Object.keys(views).forEach(function (k) {
+      views[k].classList.add('hidden');
+    });
+
+    const activeBtn = document.getElementById('tab-' + viewName);
+    if (activeBtn) {
+      activeBtn.classList.add('active', 'text-slate-100');
+      activeBtn.classList.remove('text-slate-400');
+      activeBtn.setAttribute('aria-selected', 'true');
+    }
+
+    const activeView = views[viewName];
+    if (activeView) {
+      activeView.classList.remove('hidden');
+      activeView.classList.remove('fade-in');
+      void activeView.offsetWidth;
+      activeView.classList.add('fade-in');
+    }
+
+    if (viewName === 'groups') {
+      loadProjects();
+    }
+  }
+
   tabButtons.forEach(function (btn) {
     btn.addEventListener('click', function () {
-      haptic('light');
-      tabButtons.forEach(function (b) {
-        b.classList.remove('active', 'text-slate-100');
-        b.classList.add('text-slate-400');
-        b.setAttribute('aria-selected', 'false');
-      });
-      btn.classList.add('active', 'text-slate-100');
-      btn.classList.remove('text-slate-400');
-      btn.setAttribute('aria-selected', 'true');
-      Object.keys(views).forEach(function (k) { views[k].classList.add('hidden'); });
-      const target = views[btn.dataset.view];
-      target.classList.remove('hidden');
-      target.classList.remove('fade-in'); void target.offsetWidth; target.classList.add('fade-in');
-
-      if (btn.dataset.view === 'groups') {
-        loadProjects();
-      }
+      switchTab(btn.dataset.view);
     });
   });
 
@@ -264,6 +311,7 @@
     tg.MainButton.show();
   }
 
+  // Utility Functions
   function skeletonCard() {
     return '<div class="glass rounded-2xl p-4">' +
       '<div class="skel h-3 w-2/5 rounded mb-3 animate-shimmer"></div>' +
@@ -271,6 +319,7 @@
       '<div class="skel h-2.5 w-4/5 rounded animate-shimmer"></div>' +
     '</div>';
   }
+
   function showSkeletons() {
     ['deadlines-list', 'groups-list', 'syllabus-list'].forEach(function (id) {
       document.getElementById(id).innerHTML = skeletonCard() + skeletonCard() + skeletonCard();
@@ -283,7 +332,7 @@
   let hasLoadedData = false;
   let requestInFlight = false;
 
-  // Кнопки сортировки
+  // Sort Buttons
   const sortBtns = document.querySelectorAll('.sort-btn');
   sortBtns.forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -322,7 +371,7 @@
       })
       .catch(function (err) {
         document.getElementById('error-slot').innerHTML =
-          '<div class="glass rounded-xl p-3 mb-3 text-[13px] text-rose-300" style="border-color: rgba(251,113,133,0.25);">Не удалось загрузить данные: ' + escapeHTML(err.message || String(err)) + '</div>';
+          '<div class="glass rounded-xl p-3 mb-3 text-[13px] text-rose-300" style="border-color: rgba(251,113,133,0.25);">Не удалось загрузить данные: ' + escapeHTML(err.message) + '</div>';
         if (!hasLoadedData) {
           ['deadlines-list', 'groups-list', 'syllabus-list'].forEach(function (id) {
             document.getElementById(id).innerHTML = emptyState('Нет данных.');
@@ -356,7 +405,7 @@
       })
       .catch(function (err) {
         document.getElementById('error-slot').innerHTML =
-          '<div class="glass rounded-xl p-3 mb-3 text-[13px] text-rose-300" style="border-color: rgba(251,113,133,0.25);">Не удалось загрузить проекты: ' + escapeHTML(err.message || String(err)) + '</div>';
+          '<div class="glass rounded-xl p-3 mb-3 text-[13px] text-rose-300" style="border-color: rgba(251,113,133,0.25);">Не удалось загрузить проекты: ' + escapeHTML(err.message) + '</div>';
         document.getElementById('groups-list').innerHTML = emptyState('Нет данных о проектах.');
       })
       .finally(function () {
@@ -380,77 +429,49 @@
     return '<div class="glass rounded-2xl p-6 text-center text-[13px] text-slate-400">' + escapeHTML(text) + '</div>';
   }
 
-  function typeBadge(type) {
-    const t = String(type || 'Дедлайн').toLowerCase();
-    const map = {
-      'лекция': 'bg-blue-500/15 text-blue-300', 'lecture': 'bg-blue-500/15 text-blue-300',
-      'дз': 'bg-amber-500/15 text-amber-300', 'homework': 'bg-amber-500/15 text-amber-300',
-      'дедлайн': 'bg-rose-500/15 text-rose-300', 'deadline': 'bg-rose-500/15 text-rose-300',
-      'экзамен': 'bg-purple-500/15 text-purple-300', 'проект': 'bg-emerald-500/15 text-emerald-300'
-    };
-    const cls = map[t] || 'bg-slate-500/15 text-slate-300';
-    return '<span class="text-[11px] font-semibold px-2 py-1 rounded-lg ' + cls + '">' + escapeHTML(type || 'Дедлайн') + '</span>';
-  }
+  function renderDeadlines() {
+    const list = document.getElementById('deadlines-list');
+    const deadlines = Array.isArray(state.schedule) ? state.schedule : [];
 
-  function renderDeadlines(deadlines) {
-  const container = document.getElementById('deadlines-container'); // или ваш ID контейнера
-  if (!container) return;
+    if (!deadlines.length) {
+      list.innerHTML = emptyState('Дедлайнов пока нет 🎉');
+      return;
+    }
 
-  if (!deadlines || deadlines.length === 0) {
-    container.innerHTML = '<div class="empty-state">Дедлайнов пока нет 🎉</div>';
-    return;
-  }
+    let sorted = deadlines.slice();
 
-  container.innerHTML = deadlines.map(item => {
-    // Получаем ссылку из любого возможного поля таблицы
-    const taskLink = item.Link || item.Telegram_Msg_Link || item.link || '';
-    
-    // Формируем HTML для кнопки, если ссылка присутствует
-    const linkButtonHtml = taskLink 
-      ? `<a href="${taskLink}" target="_blank" class="task-link-btn">
-          <span>🔗</span> Открыть задание в Telegram
-         </a>` 
-      : '';
-
-    return `
-      <div class="deadline-card">
-        <div class="card-header">
-          <span class="subject-badge">${escapeHtml(item.Subject || 'Общее')}</span>
-          <span class="type-badge">${escapeHtml(item.Type || 'Дедлайн')}</span>
-        </div>
-        <h3 class="task-title">${escapeHtml(item.Task || item.Task_Description || '')}</h3>
-        
-        <div class="card-footer">
-          <div class="due-date">
-            <span>📅 Сдать до:</span> <strong>${escapeHtml(item.Date || item.Deadline_Date || '')}</strong>
-          </div>
-          ${linkButtonHtml}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-// Вспомогательная функция для защиты от XSS
-function escapeHtml(str) {
-  return String(str || '').replace(/[&<>"']/g, m => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[m]));
-}
+    if (currentSort === 'date') {
+      sorted.sort(function (a, b) {
+        const dateA = new Date(a.Date || a.date || '');
+        const dateB = new Date(b.Date || b.date || '');
+        return dateA - dateB;
+      });
+    } else if (currentSort === 'credits') {
+      sorted.sort(function (a, b) {
+        const credA = Number(a.Credits || a.credits || 0);
+        const credB = Number(b.Credits || b.credits || 0);
+        return credB - credA;
+      });
+    } else if (currentSort === 'points') {
+      sorted.sort(function (a, b) {
+        const ptsA = Number(a.Points || a.points || 0);
+        const ptsB = Number(b.Points || b.points || 0);
+        return ptsB - ptsA;
+      });
+    }
 
     list.innerHTML = sorted.map(function (item) {
-      const dateLabel = formatDate(item.Date || item.date);
-      const linkUrl = safeURL(item.Link || item.Ссылка);
-      const link = linkUrl ? '<a href="' + escapeAttr(linkUrl) + '" target="_blank" rel="noopener noreferrer" class="tap-link mt-3 inline-flex items-center gap-1 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg text-white bg-blue-500/10">Открыть</a>' : '';
       const subject = item.Subject || item.Предмет || 'Общее';
       const task = item.Task || item.Задание || 'Занятие';
-      const type = item.Type || item.Тип;
-      
-      const credits = item.Credits || item.credits || item.Кредиты;
-      const points = item.Points || item.points || item.Баллы;
+      const date = item.Date || item.date || '';
+      const type = item.Type || item.Тип || 'Дедлайн';
+      const link = item.Link || item.Ссылка || '';
+      const credits = item.Credits || item.credits || '';
+      const points = item.Points || item.points || '';
 
       const creditsHtml = credits ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/20">🎓 ' + escapeHTML(credits) + ' кр.</span>' : '';
-      const pointsHtml = points ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20">⭐ ' + escapeHTML(points) + ' балл.</span>' : '';
+      const pointsHtml = points ? '<span class="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20">⭐ ' + escapeHTML(points) + ' балл</span>' : '';
+      const linkBtn = link ? '<a href="' + escapeAttr(link) + '" target="_blank" rel="noopener noreferrer" class="task-link-btn">🔗 Открыть в Telegram</a>' : '';
 
       return '<div class="glass rounded-2xl p-4">' +
         '<div class="flex items-start justify-between gap-3">' +
@@ -458,28 +479,31 @@ function escapeHtml(str) {
             '<div class="text-[14.5px] font-bold truncate">' + escapeHTML(subject) + '</div>' +
             '<div class="text-[12.5px] text-slate-400 mt-0.5">' + escapeHTML(task) + '</div>' +
           '</div>' +
-          typeBadge(type) +
+          '<span class="text-[11px] font-semibold px-2 py-1 rounded-lg bg-rose-500/15 text-rose-300 shrink-0">' + escapeHTML(type) + '</span>' +
         '</div>' +
         '<div class="flex flex-wrap items-center gap-2 mt-3 text-[12px] text-slate-400">' +
-          '<span class="text-slate-300 font-medium">⏳ ' + dateLabel + '</span>' +
+          '<span class="text-slate-300 font-medium">⏳ ' + escapeHTML(formatDate(date)) + '</span>' +
           creditsHtml +
           pointsHtml +
         '</div>' +
-        link +
+        (linkBtn ? '<div class="mt-3">' + linkBtn + '</div>' : '') +
       '</div>';
     }).join('');
-    bindTapHaptics(list);
   }
 
   function renderProjects(filterText) {
     const list = document.getElementById('groups-list');
     let rows = Array.isArray(state.projects) ? state.projects : [];
-    if (!rows.length) { list.innerHTML = emptyState('Проектов пока нет.'); return; }
+
+    if (!rows.length) {
+      list.innerHTML = emptyState('Проектов пока нет.');
+      return;
+    }
 
     if (filterText) {
       const q = filterText.toLowerCase();
       rows = rows.filter(function (project) {
-        const haystack = [project.subject, project.name, project.topic, project.Subject, project.Name, project.Topic]
+        const haystack = [project.subject, project.name, project.Subject, project.Project_Name]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
@@ -487,29 +511,32 @@ function escapeHtml(str) {
       });
     }
 
-    if (!rows.length) { list.innerHTML = emptyState('Совпадений не найдено.'); return; }
+    if (!rows.length) {
+      list.innerHTML = emptyState('Совпадений не найдено.');
+      return;
+    }
 
     list.innerHTML = rows.map(function (project) {
       const subject = project.subject || project.Subject || 'Предмет';
-      const topic = project.name || project.Name || project.topic || project.Topic || 'Без темы';
+      const name = project.name || project.Project_Name || 'Без темы';
       const deadline = project.deadline || project.Deadline || '';
-      const maxCapacity = Number(project.maxCapacity || project.maxCapacity || project.max_capacity || project.max || 0);
-      const currentCount = Number(project.currentCount || project.current_count || project.current || 0);
-      const link = extractTelegramLink(project.telegramLink || project.Telegram_Msg_Link || project.telegram_link || project.telegramLink || '');
+      const maxCap = Number(project.maxCapacity || project.Max_Capacity || 0);
+      const curCount = Number(project.currentCount || project.Current_Count || 0);
+      const telegramLink = project.telegramLink || project.Telegram_Msg_Link || '';
       const members = Array.isArray(project.members) ? project.members : [];
-      const isFull = maxCapacity > 0 && currentCount >= maxCapacity;
+      const isFull = maxCap > 0 && curCount >= maxCap;
 
       const badge = isFull
-        ? '<span class="text-[12px] font-bold px-2 py-1 rounded-lg bg-rose-600 text-white">МЕСТ НЕТ / ЗАПОЛНЕНО</span>'
-        : '<span class="text-[12px] font-semibold px-2 py-1 rounded-lg bg-emerald-600/15 text-emerald-300">' + escapeHTML(currentCount + ' / ' + maxCapacity + ' мест') + '</span>';
+        ? '<span class="text-[12px] font-bold px-2 py-1 rounded-lg bg-rose-600 text-white">МЕСТ НЕТ</span>'
+        : '<span class="text-[12px] font-semibold px-2 py-1 rounded-lg bg-emerald-600/15 text-emerald-300">' + escapeHTML(curCount + ' / ' + maxCap) + '</span>';
 
-      const telegramButton = link
-        ? '<a href="' + escapeAttr(link) + '" target="_blank" rel="noopener noreferrer" class="tap-link inline-flex items-center gap-2 text-[13px] font-semibold px-3 py-2 rounded-xl bg-blue-500 text-white">Открыть в Telegram</a>'
+      const tgBtn = telegramLink
+        ? '<a href="' + escapeAttr(telegramLink) + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-[13px] font-semibold px-3 py-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition">🔗 Группа</a>'
         : '';
 
-      const membersHtml = members.length
-        ? '<ul class="list-none m-0 p-0 space-y-1">' + members.map(function (member) {
-            return '<li class="text-[13px] text-slate-200">' + escapeHTML(member) + '</li>';
+      const membersList = members.length
+        ? '<ul class="list-none m-0 p-0 space-y-1">' + members.map(function (m) {
+            return '<li class="text-[13px] text-slate-200">• ' + escapeHTML(m) + '</li>';
           }).join('') + '</ul>'
         : '<div class="text-[13px] text-slate-400">Пока никто не записался</div>';
 
@@ -521,44 +548,41 @@ function escapeHtml(str) {
           badge +
         '</div>' +
         '<div class="mt-3 space-y-1">' +
-          '<div class="text-[13px] font-semibold text-slate-100">' + escapeHTML(topic) + '</div>' +
-          (deadline ? '<div class="text-[12.5px] text-slate-500">⏳ ' + formatDate(deadline) + '</div>' : '') +
+          '<div class="text-[13px] font-semibold text-slate-100">' + escapeHTML(name) + '</div>' +
+          (deadline ? '<div class="text-[12.5px] text-slate-500">⏳ ' + escapeHTML(formatDate(deadline)) + '</div>' : '') +
         '</div>' +
-        (telegramButton ? '<div class="mt-3">' + telegramButton + '</div>' : '') +
+        (tgBtn ? '<div class="mt-3">' + tgBtn + '</div>' : '') +
         '<div class="mt-3 pt-3 border-t border-white/5">' +
-          '<div class="text-[12px] text-slate-400 mb-2">Команда:</div>' +
-          membersHtml +
+          '<div class="text-[12px] text-slate-400 mb-2">👥 Участники:</div>' +
+          membersList +
         '</div>' +
       '</div>';
     }).join('');
-    bindTapHaptics(list);
   }
 
   function renderSyllabus() {
     const list = document.getElementById('syllabus-list');
-    if (!state.syllabus.length) { list.innerHTML = emptyState('Силлабусы пока не загружены.'); return; }
+    if (!state.syllabus.length) {
+      list.innerHTML = emptyState('Силлабусы пока не загружены.');
+      return;
+    }
 
     list.innerHTML = state.syllabus.map(function (s) {
-      const linkUrl = safeURL(s.Link || s.Ссылка);
-      const link = linkUrl
-        ? '<a href="' + escapeAttr(linkUrl) + '" target="_blank" rel="noopener noreferrer" class="tap-link inline-flex items-center gap-1 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg text-white bg-blue-500/10">Открыть</a>'
-        : '';
       const subject = s.Subject || s.Предмет || '';
-      const instructor = s.Instructor || s.Преподаватель;
+      const instructor = s.Instructor || s.Преподаватель || '';
+      const title = s.Title || '';
+      const linkUrl = s.Link || s.Ссылка || '';
+      const link = linkUrl
+        ? '<a href="' + escapeAttr(linkUrl) + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[12.5px] font-semibold px-3 py-1.5 rounded-lg text-white bg-blue-500 hover:bg-blue-600 transition">📖 Открыть</a>'
+        : '';
+
       return '<div class="glass rounded-2xl p-4">' +
         '<div class="text-[14.5px] font-bold">' + escapeHTML(subject) + '</div>' +
         (instructor ? '<div class="text-[12.5px] text-slate-400 mt-0.5">👤 ' + escapeHTML(instructor) + '</div>' : '') +
-        '<div class="text-[12.5px] text-slate-500 mt-1">' + escapeHTML(s.Title || '') + '</div>' +
-        '<div class="mt-3">' + link + '</div>' +
+        '<div class="text-[12.5px] text-slate-500 mt-1">' + escapeHTML(title) + '</div>' +
+        (link ? '<div class="mt-3">' + link + '</div>' : '') +
       '</div>';
     }).join('');
-    bindTapHaptics(list);
-  }
-
-  function bindTapHaptics(container) {
-    container.querySelectorAll('a.tap-link').forEach(function (a) {
-      a.addEventListener('click', function () { haptic('light'); });
-    });
   }
 
   document.getElementById('group-search').addEventListener('input', function (e) {
@@ -566,42 +590,19 @@ function escapeHtml(str) {
   });
 
   function formatDate(value) {
+    if (!value) return '';
     const d = new Date(value);
-    if (isNaN(d.getTime())) return escapeHTML(String(value || ''));
+    if (isNaN(d.getTime())) return escapeHTML(String(value));
     return d.toLocaleDateString('ru-RU', { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
   function escapeHTML(str) {
-    return String(str).replace(/[&<>"']/g, function (c) {
+    return String(str || '').replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
 
   function escapeAttr(str) { return escapeHTML(str); }
-
-  function safeURL(value) {
-    if (!value) return '';
-    const raw = String(value).trim();
-    const candidate = extractTelegramLink(raw);
-    if (!candidate) return '';
-    try {
-      const url = new URL(candidate, window.location.href);
-      if (url.protocol === 'https:' || url.protocol === 'http:') return url.href;
-    } catch (err) {
-      console.warn('Некорректная ссылка пропущена', err);
-    }
-    return '';
-  }
-
-  function extractTelegramLink(value) {
-    if (!value) return '';
-    const raw = String(value).trim();
-    const mdMatch = raw.match(/\((https?:\/\/[^)]+)\)$/i);
-    if (mdMatch && mdMatch[1]) return mdMatch[1];
-    const urlMatch = raw.match(/https?:\/\/[^\s)]+/i);
-    if (urlMatch && urlMatch[0]) return urlMatch[0];
-    return raw.startsWith('http') ? raw : '';
-  }
 
   loadAll();
 })();
