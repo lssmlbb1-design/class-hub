@@ -228,27 +228,32 @@ function handleTextMessage(message) {
   const chatId = message.chat.id;
   const text = (message.text || '').trim();
 
-  // Игнорируем пустые сообщения
-  if (!text) return;
+  Logger.log("📩 1. Пришло сообщение от ID " + chatId + ": '" + text + "'");
 
-  // Если у вас есть функции поиска по таблице (например, findDeadlines, findSyllabus и т.д.):
-  // Вызывайте вашу рабочую логику обработчиков команд/вопросов здесь:
-  
+  if (!text) {
+    Logger.log("⚠️ Сообщение пустое, выходим.");
+    return;
+  }
+
   let replyText = "";
 
-  // Пример обработки команд и поисковых запросов:
-  if (text.startsWith('/start') || text.startsWith('/help')) {
-    replyText = "👋 Привет! Я Class Hub бот.\nЗадайте вопрос по ДЗ, расписанию или дедлайнам!";
-  } else {
-    // Здесь вызывается ваша основная функция поиска по Google Таблице:
-    // (Замените processUserQuery на название вашей функции из code.js, если она называется иначе)
+  try {
+    // ВНИМАНИЕ: Замените processUserQuery на имя ВАШЕЙ функции поиска по таблице
     replyText = processUserQuery(text); 
+    Logger.log("🔍 2. Результат поиска из таблицы: " + replyText);
+  } catch (err) {
+    Logger.log("❌ 3. Ошибка внутри функции поиска: " + err.toString());
+    replyText = "⚠️ Ошибка при чтении Google Таблицы: " + err.message;
   }
 
-  // Если ответ сформирован — отправляем его в чат
-  if (replyText) {
-    sendMessage(chatId, replyText);
+  // Если функция поиска вернула пустую строку, формируем заглушку
+  if (!replyText) {
+    replyText = "ℹ️ По запросу '" + text + "' ничего не найдено в таблице.";
+    Logger.log("⚠️ 4. Ответ был пустым, отправлена стандартная заглушка.");
   }
+
+  // Отправка в Telegram
+  sendMessage(chatId, replyText);
 }
 
 /**
@@ -372,77 +377,28 @@ function handleCallbackQuery(cq) {
 }
 
 // === ОБРАБОТКА КНОПКИ СОГЛАСИЯ В TELEGRAM ===
-function handleInviteCallback(cq) {
-  const data = cq.data || '';
-  const parts = data.split(':');
-  if (parts.length < 3) return;
+function handleInviteCallback(callbackQuery) {
+  const userId = callbackQuery.from.id;
+  const chatId = callbackQuery.message.chat.id;
 
-  const action = parts[0];       // acc или rej
-  const studentName = parts[1];
-  const projectName = parts[2];
-
-  const lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(10000);
-
-    if (action === 'rej') {
-      answerCallback(cq.id, 'Вы отклонили приглашение.', true);
-      editTelegramMessage(cq.message.chat.id, cq.message.message_id, `❌ <b>${esc(studentName)}</b> отклонил(а) приглашение в проект <b>«${esc(projectName)}»</b>.`);
-      return;
-    }
-
-    if (action === 'acc') {
-      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      const projSheet = ss.getSheetByName('Projects');
-      if (!projSheet) {
-        answerCallback(cq.id, 'Ошибка: Вкладка Projects не найдена!', true);
-        return;
-      }
-
-      const projData = projSheet.getDataRange().getValues();
-      let rowIndex = -1;
-
-      for (let i = 1; i < projData.length; i++) {
-        if (String(projData[i][1]).trim().toLowerCase() === String(projectName).trim().toLowerCase()) {
-          rowIndex = i;
-          break;
-        }
-      }
-
-      if (rowIndex === -1) {
-        answerCallback(cq.id, '❌ Проект не найден.', true);
-        return;
-      }
-
-      const maxCap = Number(projData[rowIndex][3]) || 0;
-      const curCount = Number(projData[rowIndex][4]) || 0;
-      let membersStr = String(projData[rowIndex][5] || '').trim();
-
-      if (curCount >= maxCap) {
-        answerCallback(cq.id, '⚠️ В проекте больше нет свободных мест!', true);
-        editTelegramMessage(cq.message.chat.id, cq.message.message_id, `⚠️ Приглашение для <b>${esc(studentName)}</b> недействительно: проект <b>«${esc(projectName)}»</b> уже заполнен.`);
-        return;
-      }
-
-      // Добавляем участника в список
-      let membersList = membersStr ? membersStr.split(',').map(s => s.trim()) : [];
-      if (!membersList.includes(studentName)) {
-        membersList.push(studentName);
-      }
-
-      // Обновляем Current_Count (колонка 5) и Members (колонка 6)
-      projSheet.getRange(rowIndex + 1, 5).setValue(membersList.length);
-      projSheet.getRange(rowIndex + 1, 6).setValue(membersList.join(', '));
-
-      answerCallback(cq.id, '✅ Вы успешно присоединены к проекту!', false);
-      editTelegramMessage(cq.message.chat.id, cq.message.message_id, `🎉 <b>${esc(studentName)}</b> принял(а) приглашение и зачислен(а) в проект <b>«${esc(projectName)}»</b>!`);
-    }
-
-  } catch (err) {
-    Logger.log('Callback error: ' + err);
-  } finally {
-    lock.releaseLock();
+  // Если кнопку может нажимать ТОЛЬКО админ:
+  if (!isAdmin(userId)) {
+    // Отправляем всплывающее уведомление в Telegram "Нет доступа"
+    const url = 'https://api.telegram.org/bot' + BOT_TOKEN + '/answerCallbackQuery';
+    UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({
+        callback_query_id: callbackQuery.id,
+        text: "⛔ Эта кнопка доступна только администраторам!",
+        show_alert: true
+      }),
+      muteHttpExceptions: true
+    });
+    return;
   }
+
+  // Логика обработки нажатия кнопки для авторизованного пользователя...
 }
 
 // Старая система (enroll) для совместимости
@@ -1003,5 +959,271 @@ function updateFormProjectOptions() {
     }
   } catch (err) {
     Logger.log('❌ Ошибка обновления формы: ' + err);
+  }
+}
+
+// ============================================================
+// Telegram text-query helpers (ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ)
+// ============================================================
+
+/**
+ * Главный обработчик текстовых сообщений из Telegram
+ */
+function handleTextMessage(message) {
+  const chatId = message.chat.id;
+  const userId = message.from ? message.from.id : null;
+  const text = (message.text || '').trim();
+
+  if (!text) return;
+
+  // === ПРОВЕРКА ПРАВ ДОСТУПА ДЛЯ АДМИНСКИХ КОМАНД ===
+  // Если команда начинается с /admin или требует прав:
+  if (text.startsWith('/admin') || text.startsWith('/add')) {
+    if (!isAdmin(userId)) {
+      sendMessage(chatId, "⛔ <b>Отказ в доступе.</b> У вас нет прав для выполнения этой команды.");
+      return;
+    }
+  }
+
+  let replyText = "";
+
+  try {
+    if (text.startsWith('/start') || text.startsWith('/help')) {
+      replyText = "👋 Привет! Я Class Hub бот.\nЗадайте вопрос по ДЗ, расписанию или дедлайнам!";
+    } else {
+      replyText = processUserQuery(text);
+    }
+
+    if (replyText) {
+      sendMessage(chatId, replyText);
+    }
+  } catch (err) {
+    Logger.log('❌ Ошибка при обработке сообщения: ' + err.toString());
+  }
+}
+
+/**
+ * Распределитель запросов по категориям
+ */
+function processUserQuery(userMessage) {
+  try {
+    const query = String(userMessage || '').toLowerCase().trim();
+
+    // 1. Проверка на ДЗ
+    if (query.includes('дз') || query.includes('задачу') || query.includes('задали') || 
+        query.includes('что задавали') || query.includes('домашнее') || query.includes('deadline')) {
+      return findHomeworkBySubject(query);
+    }
+
+    // 2. Проверка на Расписание
+    if (query.includes('расписани') || query.includes('график') || query.includes('когда') || query.includes('schedule')) {
+      return findScheduleInfo(query);
+    }
+
+    // 3. Проверка на Проекты
+    if (query.includes('проект') || query.includes('project') || query.includes('группа')) {
+      return findProjectInfo(query);
+    }
+
+    // ВМЕСТО СПАМ-ОТВЕТА: Возвращаем пустую строку, чтобы бот молчал на обычные фразы
+    return "";
+
+  } catch (err) {
+    Logger.log('❌ Ошибка в processUserQuery: ' + err.toString());
+    return '';
+  }
+}
+
+function findHomeworkBySubject(query) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const hwData = getSheetData(SHEET_NAMES.homeworkPool);
+    const results = [];
+
+    const targetSubject = extractSubject(query);
+
+    hwData.forEach(row => {
+      const subject = String(row.Subject || '').toLowerCase();
+      const status = String(row.Status || 'Active').toLowerCase();
+
+      if (status !== 'active') return;
+
+      if (!targetSubject || subject.includes(targetSubject)) {
+        results.push({
+          subject: row.Subject,
+          task: row.Task_Description || row.Task,
+          deadline: row.Deadline_Date || row.Date
+        });
+      }
+    });
+
+    if (results.length === 0) {
+      const deadlineData = getSheetData(SHEET_NAMES.deadlines);
+      deadlineData.forEach(row => {
+        const subject = String(row.Subject || '').toLowerCase();
+        if (!targetSubject || subject.includes(targetSubject)) {
+          results.push({
+            subject: row.Subject,
+            task: row.Task || row.Task_Description,
+            deadline: row.Date || row.Deadline_Date
+          });
+        }
+      });
+    }
+
+    if (results.length === 0) {
+      return '📋 По вашему запросу ничего не найдено. Проверьте название предмета.';
+    }
+
+    let response = '📚 <b>Найденные дедлайны:</b>\n\n';
+    results.slice(0, 5).forEach((r, idx) => {
+      response += `${idx + 1}. <b>[${esc(r.subject || 'Без предмета')}]</b>\n`;
+      response += `   📝 ${esc(r.task || 'Нет описания')}\n`;
+      response += `   ⏰ Дедлайн: <i>${r.deadline || 'Не указан'}</i>\n\n`;
+    });
+
+    return response;
+
+  } catch (err) {
+    Logger.log('❌ Ошибка в findHomeworkBySubject: ' + err.toString());
+    return '❌ Ошибка при поиске ДЗ. Попробуйте позже.';
+  }
+}
+
+function findScheduleInfo(query) {
+  try {
+    const scheduleData = getSheetData(SHEET_NAMES.schedule);
+    if (!scheduleData || scheduleData.length === 0) return '📅 Расписание не найдено.';
+
+    let response = '📅 <b>Расписание:</b>\n\n';
+    scheduleData.slice(0, 10).forEach((r, idx) => {
+      response += `${idx + 1}. <b>${r.Day || 'N/A'}</b> | ${r.Subject || 'N/A'}\n`;
+      response += `   🕐 ${r.Time || 'N/A'}\n\n`;
+    });
+
+    return response;
+  } catch (err) {
+    Logger.log('❌ Ошибка в findScheduleInfo: ' + err.toString());
+    return '❌ Ошибка при поиске расписания.';
+  }
+}
+
+function findProjectInfo(query) {
+  try {
+    const projectsData = getSheetData(SHEET_NAMES.projects);
+    if (!projectsData || projectsData.length === 0) return '📦 Проектов не найдено.';
+
+    const activeProjects = projectsData.filter(p => 
+      String(p.Status || 'Active').toLowerCase() !== 'expired' && 
+      String(p.Status || 'Active').toLowerCase() !== 'archived'
+    );
+
+    if (activeProjects.length === 0) return '📦 Активных проектов нет.';
+
+    let response = '📦 <b>Доступные проекты:</b>\n\n';
+    activeProjects.slice(0, 5).forEach((p, idx) => {
+      const currentCount = Number(p.Current_Count) || 0;
+      const maxCap = Number(p.Max_Capacity) || 0;
+
+      response += `${idx + 1}. <b>${esc(p.Project_Name || 'N/A')}</b>\n`;
+      response += `   📚 Предмет: ${esc(p.Subject || 'N/A')}\n`;
+      response += `   👥 Мест: ${Math.max(0, maxCap - currentCount)}/${maxCap}\n\n`;
+    });
+
+    return response;
+  } catch (err) {
+    Logger.log('❌ Ошибка в findProjectInfo: ' + err.toString());
+    return '❌ Ошибка при поиске проектов.';
+  }
+}
+
+function extractSubject(query) {
+  const match = query.match(/по\s+([а-яa-z0-9]+)/i);
+  if (!match || !match[1]) return '';
+  
+  // Берём корень слова (первые 4-5 букв), чтобы игнорировать окончания (матема..., биолог...)
+  const word = match[1].toLowerCase();
+  return word.length > 5 ? word.slice(0, 5) : word;
+}
+
+function sendMessage(chatId, text) {
+  const url = 'https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage';
+  const payload = {
+    chat_id: chatId,
+    text: text,
+    parse_mode: 'HTML'
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  try {
+    UrlFetchApp.fetch(url, options);
+  } catch (err) {
+    Logger.log('❌ Ошибка при отправке сообщения: ' + err.toString());
+  }
+}
+
+
+
+/**
+ * Автоматически срабатывает при отправке Google Формы
+ */
+/**
+ * Автоматический обработчик отправки Google Формы для админов
+ */
+/**
+ * Умный обработчик Google Формы — защищает таблицу от сдвига колонок
+ */
+function onFormSubmit(e) {
+  try {
+    if (!e || !e.values) return;
+
+    // e.values содержит ответы:
+    // [0] Timestamp, [1] Название, [2] Предмет, [3] Дедлайн, [4] Макс. мест
+    const rawName = String(e.values[1] || '').trim();
+    const rawSubject = String(e.values[2] || '').trim();
+    const rawDeadline = String(e.values[3] || '').trim();
+    const rawCapacity = parseInt(e.values[4], 10) || 5;
+
+    if (!rawName) return;
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAMES.projects);
+    if (!sheet) return;
+
+    // Генерируем правильный ID (например PRJ-005)
+    const lastRow = sheet.getLastRow();
+    const projectId = "PRJ-" + String(lastRow).padStart(3, '0');
+
+    // Формируем ЖЁСТКИЙ массив строго по колонкам таблицы:
+    // A: Project_ID
+    // B: Project_Name
+    // C: Subject
+    // D: Max_Capacity
+    // E: Current_Count (0)
+    // F: Members (пусто)
+    // G: Deadline
+    // H: Status (Active)
+    const formattedRow = [
+      projectId,
+      rawName,
+      rawSubject,
+      rawCapacity,
+      0,
+      "",
+      rawDeadline,
+      "Active"
+    ];
+
+    sheet.appendRow(formattedRow);
+    Logger.log("✅ Проект успешно записан в таблицу: " + projectId);
+
+  } catch (err) {
+    Logger.log("❌ Ошибка в onFormSubmit: " + err.toString());
   }
 }
