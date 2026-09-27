@@ -81,6 +81,7 @@
 
     .badge-capacity { background: #e8f5e9; color: #2e7d32; }
     .badge-full { background: #ffebee; color: #c62828; }
+    .badge-week { background: #f3e5f5; color: #7b1fa2; }
 
     .card-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
     .card-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
@@ -122,7 +123,7 @@
   <nav>
     <button class="tab-btn active" data-tab="deadlines">📅 Дедлайны</button>
     <button class="tab-btn" data-tab="projects">👥 Проекты</button>
-    <button class="tab-btn" data-tab="groups">📚 Предметы</button>
+    <button class="tab-btn" data-tab="syllabus">📚 Силлабус</button>
   </nav>
 
   <main>
@@ -134,13 +135,12 @@
       <div id="projects-container" class="loading">Загрузка данных...</div>
     </section>
 
-    <section id="groups" class="tab-content">
-      <div id="groups-container" class="loading">Загрузка данных...</div>
+    <section id="syllabus" class="tab-content">
+      <div id="syllabus-container" class="loading">Загрузка данных...</div>
     </section>
   </main>
 
   <script>
-    // ВАША АКТУАЛЬНАЯ ССЫЛКА НА GOOGLE APPS SCRIPT
     const API_URL = 'https://script.google.com/macros/s/AKfycbzLu1rrwQDBCzMzyW3XnFfFA1GsGWY715qEJ3_oe-MKwHl3t4NKWSiFFENyPHTblP2PgQ/exec';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -148,7 +148,6 @@
       loadAllData();
     });
 
-    // Переключение вкладок без повторных запросов
     function setupTabs() {
       const buttons = document.querySelectorAll('.tab-btn');
       const contents = document.querySelectorAll('.tab-content');
@@ -167,11 +166,10 @@
       });
     }
 
-    // Загрузка ВСЕХ данных за 1 быстрый запрос
     async function loadAllData() {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000); // Тайм-аут 12 сек
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
         const response = await fetch(`${API_URL}?action=getAll`, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -185,7 +183,7 @@
 
         renderDeadlines(result.data.deadlines || []);
         renderProjects(result.data.projects || []);
-        renderGroups(result.data.groups || []);
+        renderSyllabus(result.data.syllabus || []);
 
       } catch (err) {
         console.error('Data load error:', err);
@@ -196,7 +194,7 @@
     function showError(msg) {
       document.getElementById('deadlines-container').innerHTML = `<div class="error">${msg}</div>`;
       document.getElementById('projects-container').innerHTML = `<div class="error">${msg}</div>`;
-      document.getElementById('groups-container').innerHTML = `<div class="error">${msg}</div>`;
+      document.getElementById('syllabus-container').innerHTML = `<div class="error">${msg}</div>`;
     }
 
     // 1. Отрисовка дедлайнов
@@ -261,25 +259,33 @@
       }).join('');
     }
 
-    // 3. Отрисовка предметов/групп
-    function renderGroups(items) {
-      const container = document.getElementById('groups-container');
+    // 3. Отрисовка Силлабуса
+    function renderSyllabus(items) {
+      const container = document.getElementById('syllabus-container');
 
       if (!items.length) {
-        container.innerHTML = '<div class="empty">Предметы не найдены 🎉</div>';
+        container.innerHTML = '<div class="empty">Силлабус пока не заполнен 🎉</div>';
         return;
       }
 
-      container.innerHTML = items.map(item => `
-        <div class="card">
-          <div class="card-title">${esc(item.Subject || 'Название предмета')}</div>
-          <div class="card-desc">👨‍🏫 Преподаватель: ${esc(item.Teacher || 'Не указан')}</div>
-          <div class="card-footer">
-            ${item.Drive_Link ? `<a href="${esc(item.Drive_Link)}" target="_blank" class="btn-link">📁 Google Drive</a>` : '<span></span>'}
-            ${item.Chat_Link ? `<a href="${esc(item.Chat_Link)}" target="_blank" class="btn-link">💬 Чат предмета</a>` : ''}
+      container.innerHTML = items.map(item => {
+        const week = item.Week || item.Module || '';
+        const link = item.Link || item.Materials_Link || '';
+
+        return `
+          <div class="card">
+            <div class="card-header">
+              <span class="badge">${esc(item.Subject || 'Предмет')}</span>
+              ${week ? `<span class="badge badge-week">Неделя/Модуль: ${esc(week)}</span>` : ''}
+            </div>
+            <div class="card-title">${esc(item.Topic || item.Title || 'Без темы')}</div>
+            ${item.Description ? `<div class="card-desc">${esc(item.Description)}</div>` : ''}
+            <div class="card-footer">
+              ${link ? `<a href="${esc(link)}" target="_blank" class="btn-link">📁 Материалы занятий</a>` : '<span></span>'}
+            </div>
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     function esc(str) {
