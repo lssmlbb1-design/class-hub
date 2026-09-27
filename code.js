@@ -10,7 +10,7 @@ const WEB_APP_TELEGRAM_LINK = 'https://lssmlbb1-design.github.io/class-hub/';
 const SPREADSHEET_ID = '1ygTKJmW_9GWwPspc1RY2yJjvfI8WT5XsFf2NNZuAT_M';
 
 // Your deployed /exec URL
-const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzLu1rrwQDBCzMzyW3XnFfFA1GsGWY715qEJ3_oe-MKwHl3t4NKWSiFFENyPHTblP2PgQ/exec';
+const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxwvJdHq7pDG6YGRs8Z_2yyeyCOUW7RLJEyevZEWE-KE-TDZCI3mU5tdqMGPQUR7ucR/exec';
 
 // Optional shared secret
 const WEBHOOK_SECRET = '1234899384';
@@ -113,19 +113,23 @@ function getSheetData(sheetName) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return [];
-
+  
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
+  
   const headers = values[0].map(h => String(h).trim());
-
   const rows = [];
+  
   for (let i = 1; i < values.length; i++) {
-    const row = values[i];
-    if (row.every(c => c === '' || c === null)) continue;
+    // Пропускаем полностью пустые строки
+    if (values[i].every(c => c === '' || c === null)) continue;
+    
     const obj = {};
     headers.forEach((h, idx) => {
-      let v = row[idx];
-      if (v instanceof Date) v = Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      let v = values[i][idx];
+      if (v instanceof Date) {
+        v = Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      }
       obj[h] = v;
     });
     rows.push(obj);
@@ -312,96 +316,77 @@ function handleCallbackQuery(cq) {
   }
 }
 
+// === ОБРАБОТКА КНОПКИ СОГЛАСИЯ В TELEGRAM ===
 function handleInviteCallback(cq) {
   const data = cq.data || '';
   const parts = data.split(':');
-  const action = parts[0];
-  const studentName = parts[1] ? decodeURIComponent(parts[1]) : '';
-  const projectName = parts[2] ? decodeURIComponent(parts[2]) : '';
-  const messageId = cq.message.message_id;
-  const chatId = cq.message.chat.id;
-  const threadId = cq.message.message_thread_id;
+  if (parts.length < 3) return;
 
-  if (action === 'rej') {
-    // Отказ: просто обновляем сообщение
-    answerCallback(cq.id, 'Вы отклонили приглашение.', false);
-    editTelegramMessage(chatId, messageId, 
-      '❌ <b>' + esc(studentName) + '</b> отклонил(а) приглашение в проект «' + esc(projectName) + '».'
-    );
-    return;
-  }
+  const action = parts[0];       // acc или rej
+  const studentName = parts[1];
+  const projectName = parts[2];
 
-  if (action === 'acc') {
-    // Согласие: проверяем свободные места
-    const lock = LockService.getScriptLock();
-    try {
-      lock.waitLock(10000);
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
 
+    if (action === 'rej') {
+      answerCallback(cq.id, 'Вы отклонили приглашение.', true);
+      editTelegramMessage(cq.message.chat.id, cq.message.message_id, `❌ <b>${esc(studentName)}</b> отклонил(а) приглашение в проект <b>«${esc(projectName)}»</b>.`);
+      return;
+    }
+
+    if (action === 'acc') {
       const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      const projSheet = ss.getSheetByName(SHEET_NAMES.projects);
-      const studSheet = ss.getSheetByName(SHEET_NAMES.studentProjects);
-      
+      const projSheet = ss.getSheetByName('Projects');
+      if (!projSheet) {
+        answerCallback(cq.id, 'Ошибка: Вкладка Projects не найдена!', true);
+        return;
+      }
+
       const projData = projSheet.getDataRange().getValues();
-      
-      let projectRow = -1;
-      let maxCap = 0;
-      let curCount = 0;
-      let subject = '';
+      let rowIndex = -1;
 
       for (let i = 1; i < projData.length; i++) {
-        if (String(projData[i][1]).trim().toLowerCase() === projectName.toLowerCase()) {
-          projectRow = i;
-          maxCap = Number(projData[i][3]) || 0;
-          curCount = Number(projData[i][4]) || 0;
-          subject = projData[i][2] || '';
+        if (String(projData[i][1]).trim().toLowerCase() === String(projectName).trim().toLowerCase()) {
+          rowIndex = i;
           break;
         }
       }
 
-      if (projectRow === -1) {
+      if (rowIndex === -1) {
         answerCallback(cq.id, '❌ Проект не найден.', true);
-        editTelegramMessage(chatId, messageId, 
-          '❌ Проект не найден. Приглашение истекло.'
-        );
         return;
       }
 
-      // Проверка: есть ли свободные места?
+      const maxCap = Number(projData[rowIndex][3]) || 0;
+      const curCount = Number(projData[rowIndex][4]) || 0;
+      let membersStr = String(projData[rowIndex][5] || '').trim();
+
       if (curCount >= maxCap) {
-        answerCallback(cq.id, '⚠️ В этой команде больше нет мест!', true);
-        editTelegramMessage(chatId, messageId, 
-          '❌ Проект заполнен! ' + esc(studentName) + ' не может присоединиться к «' + esc(projectName) + '».'
-        );
+        answerCallback(cq.id, '⚠️ В проекте больше нет свободных мест!', true);
+        editTelegramMessage(cq.message.chat.id, cq.message.message_id, `⚠️ Приглашение для <b>${esc(studentName)}</b> недействительно: проект <b>«${esc(projectName)}»</b> уже заполнен.`);
         return;
       }
 
-      // Проверка: не записан ли уже?
-      const studentData = studSheet.getDataRange().getValues();
-      const isEnrolled = studentData.slice(1).some(r => 
-        String(r[1]).trim().toLowerCase() === studentName.toLowerCase() && 
-        String(r[3]).trim().toLowerCase() === projectName.toLowerCase()
-      );
-
-      if (isEnrolled) {
-        answerCallback(cq.id, 'Вы уже состоите в этой команде!', false);
-        return;
+      // Добавляем участника в список
+      let membersList = membersStr ? membersStr.split(',').map(s => s.trim()) : [];
+      if (!membersList.includes(studentName)) {
+        membersList.push(studentName);
       }
 
-      // Добавляем студента и увеличиваем счетчик
-      projSheet.getRange(projectRow + 1, 5).setValue(curCount + 1);
-      studSheet.appendRow(['', studentName, subject, projectName, new Date().toISOString()]);
+      // Обновляем Current_Count (колонка 5) и Members (колонка 6)
+      projSheet.getRange(rowIndex + 1, 5).setValue(membersList.length);
+      projSheet.getRange(rowIndex + 1, 6).setValue(membersList.join(', '));
 
-      answerCallback(cq.id, '✅ Вы успешно добавлены в команду!', false);
-      editTelegramMessage(chatId, messageId, 
-        '🎉 <b>' + esc(studentName) + '</b> принял(а) приглашение и зачислен(а) в проект «' + esc(projectName) + '»!'
-      );
-
-    } catch (err) {
-      Logger.log('Invite callback error: ' + err);
-      answerCallback(cq.id, '❌ Ошибка при обработке приглашения.', true);
-    } finally {
-      lock.releaseLock();
+      answerCallback(cq.id, '✅ Вы успешно присоединены к проекту!', false);
+      editTelegramMessage(cq.message.chat.id, cq.message.message_id, `🎉 <b>${esc(studentName)}</b> принял(а) приглашение и зачислен(а) в проект <b>«${esc(projectName)}»</b>!`);
     }
+
+  } catch (err) {
+    Logger.log('Callback error: ' + err);
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -548,22 +533,18 @@ function answerCallback(callbackQueryId, text, showAlert) {
 // ============================================================
 
 function setupWebhook() {
-  const webAppUrl = ScriptApp.getService().getUrl();
+  // Берём ссылку напрямую из константы WEBHOOK_URL
+  const webAppUrl = WEBHOOK_URL;
   
-  if (!webAppUrl || webAppUrl.indexOf('/exec') === -1) {
-    Logger.log('ОШИБКА: Сначала сделайте Deploy как Веб-приложение!');
+  if (!webAppUrl || webAppUrl.indexOf('/exec') === -1 || webAppUrl.includes('ВАША_СКОПИРОВАННАЯ_ССЫЛКА')) {
+    Logger.log('ОШИБКА: Укажите корректную ссылку /exec в переменной WEBHOOK_URL вверху файла!');
     return;
   }
 
-  const webhookUrl = webAppUrl + '?token=' + encodeURIComponent(WEBHOOK_SECRET);
-  const telegramApiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook?url=' + encodeURIComponent(webhookUrl);
+  const telegramApiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook?url=' + encodeURIComponent(webAppUrl) + (WEBHOOK_SECRET ? '?token=' + encodeURIComponent(WEBHOOK_SECRET) : '');
   
-  try {
-    const response = UrlFetchApp.fetch(telegramApiUrl);
-    Logger.log('Webhook setup result: ' + response.getContentText());
-  } catch (err) {
-    Logger.log('Webhook setup error: ' + err);
-  }
+  const response = UrlFetchApp.fetch(telegramApiUrl);
+  Logger.log('Результат привязки вебхука: ' + response.getContentText());
 }
 
 function deleteWebhook() {
@@ -928,3 +909,14 @@ function removeProjectFromFormChoices(projectName) {
     Logger.log('Form update error: ' + err.toString());
   }
 }
+
+
+
+
+
+
+
+
+
+
+
