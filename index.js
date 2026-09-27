@@ -5,12 +5,11 @@ export default {
     }
 
     try {
-      // Ваша ссылка на Google Apps Script (/exec)
-      const GAS_URL = "https://script.google.com/macros/s/AKfycbwAB7u0yqcXRQ09x7EXRxeMTsEzIVlqBvbBn_beXQHvJHFxl-rB0TqkkHiMJ3xy6EGcMQ/exec";
+      // Новая актуальная ссылка на ваше веб-приложение:
+      const GAS_URL = "https://script.google.com/macros/s/AKfycbwAB7u0yqcXRQ09x7EXRxeMTsEzIVlqBvbBn_beXQHvJHFxl-rB0TqkkHiMJ3xy6EGcMJ3xy6EGcMQ/exec";
 
       const body = await request.text();
 
-      // Фоновая пересылка в Google Apps Script
       ctx.waitUntil(
         fetch(GAS_URL, {
           method: "POST",
@@ -19,7 +18,6 @@ export default {
         })
       );
 
-      // Мгновенный 200 OK для Telegram
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" }
