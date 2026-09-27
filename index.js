@@ -6,7 +6,7 @@ export default {
 
     try {
       // Новая актуальная ссылка на ваше веб-приложение:
-      const GAS_URL = "https://script.google.com/macros/s/AKfycbwMXejYR6g5kbdsNO_AS5MvUvI_OWRG3M9Z486-AiyImYXUCyCtB9zWm245JpCRvKQIkg/exec";
+      const GAS_URL = "https://script.google.com/macros/s/AKfycbxu61h-85AKMbKXPuMMrEWgdZWetsEKLKTTjZPez_jeRViDmJl64If-TlMCglADwqFY3w/exec";
 
       const body = await request.text();
 
