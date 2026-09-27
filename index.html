@@ -372,7 +372,7 @@
   <div class="toast" id="toast"></div>
 
 <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbw09kX8dMr_dngydExPwtMlcPF9aKxrPspwfcCTeSSRFIIr_uz6_9XhoqsdBmjQeh6gEA/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzly3xaxSq1KoKpKKyuszspCnVfKc8zvmxrYMFQq1YTzqgEhXKOdkol4T95IrWdx2ff/exec";
     let currentProjectId = null;
 
     const $ = (id) => document.getElementById(id);
@@ -401,7 +401,7 @@
     $('cancelBtn').addEventListener('click', closeModal);
     $('joinModal').addEventListener('click', (e) => { if (e.target ===$('joinModal')) closeModal(); });
 
-    // ===== ОТПРАВКА ЗАЯВКИ =====
+    // ===== ОТПРАВКА ЗАЯВКИ (БЕЗ CORS ОШИБКИ) =====
     $('submitJoinBtn').addEventListener('click', async () => {
       const studentName = $('studentName').value.trim();
       const studentId = $('studentTelegramId').value.trim();
@@ -410,6 +410,9 @@
         alert('Пожалуйста, заполните все поля.');
         return;
       }
+
+      $('submitJoinBtn').disabled = true;
+      $('submitJoinBtn').textContent = 'Отправка...';
 
       try {
         await fetch(GAS_URL, {
@@ -427,6 +430,9 @@
         showToast('✅ Заявка отправлена лидеру проекта!');
       } catch (error) {
         alert('❌ Ошибка отправки: ' + error.message);
+      } finally {
+        $('submitJoinBtn').disabled = false;
+        $('submitJoinBtn').textContent = 'Отправить';
       }
     });
 
@@ -437,24 +443,19 @@
       setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
-    // ===== ЕДИНАЯ ЗАГРУЗКА ВСЕХ ДАННЫХ =====
+    // ===== ЗАГРУЗКА ДАННЫХ =====
     async function loadAllData() {
       try {
         const response = await fetch(GAS_URL);
         if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
         
         const raw = await response.json();
-        console.log("Получены данные от сервера:", raw);
 
         let projects = [], deadlines = [], syllabus = [];
 
         if (Array.isArray(raw)) {
           projects = raw;
-        } else if (raw.data) {
-          projects = raw.data.projects || [];
-          deadlines = raw.data.deadlines || [];
-          syllabus = raw.data.syllabus || [];
-        } else {
+        } else if (raw.projects || raw.deadlines) {
           projects = raw.projects || [];
           deadlines = raw.deadlines || [];
           syllabus = raw.syllabus || [];
@@ -466,11 +467,9 @@
 
       } catch (error) {
         console.error("Критическая ошибка:", error);
-        const errHtml = `<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #742a2a; background: #fed7d7; border-radius: 8px;">
-          <strong>❌ Не удалось загрузить данные:</strong> ${escape(error.message)}<br>
-          <small>Проверьте, что в Google Apps Script доступ выставлен на "Все" (Anyone).</small>
+        $('projectsList').innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #742a2a; background: #fed7d7; border-radius: 8px;">
+          <strong>❌ Не удалось загрузить данные:</strong> ${escape(error.message)}
         </div>`;
-        $('projectsList').innerHTML = errHtml;
       }
     }
 
@@ -487,6 +486,7 @@
         const name = p.Project_Name || p.projectName || 'Без названия';
         const subject = p.Subject || p.subject || '—';
         const deadline = p.Deadline || p.deadline || '—';
+        const points = p.Points || p.points || p.Credits || '';
         const maxCap = Number(p.Max_Capacity || p.maxCapacity || 0);
         const currCount = Number(p.Current_Count || p.currentCount || 1);
         const available = Math.max(0, maxCap - currCount);
@@ -503,6 +503,7 @@
             <h3>${escape(name)}</h3>
             <div class="card-meta"><strong>📚 Предмет:</strong> ${escape(subject)}</div>
             <div class="card-meta"><strong>📅 Дедлайн:</strong> ${escape(deadline)}</div>
+            ${points ? `<div class="card-meta"><strong>🏆 Баллы / Кредиты:</strong> ${escape(points)}</div>` : ''}
             <div class="card-meta"><strong>👥 Свободно мест:</strong> ${available}/${maxCap}</div>
             <div class="members-box">
               <strong>Участники:</strong> ${membersStr}
@@ -514,7 +515,7 @@
       }).join('');
     }
 
-    // ===== ОТРИСОВКА ДЕДЛАЙНОВ =====
+    // ===== ОТРИСОВКА ДЕДЛАЙНОВ ВМЕСТЕ С ССЫЛКАМИ И БАЛЛАМИ =====
     function renderDeadlines(deadlines) {
       const container = $('deadlinesList');
       if (!Array.isArray(deadlines) || deadlines.length === 0) {
@@ -522,14 +523,19 @@
         return;
       }
 
-      container.innerHTML = deadlines.slice(0, 12).map(d => `
-        <div class="card">
-          <h3>${escape(d.Subject || d.subject || 'Без предмета')}</h3>
-          <div class="card-meta"><strong>Задание:</strong> ${escape(d.Task_Name || d.Task || d.task || '—')}</div>
-          <div class="card-meta"><strong>📅 До:</strong> ${escape(d.Deadline_Date || d.Date || d.date || '—')}</div>
-          <div class="card-meta"><strong>Тип:</strong> ${escape(d.Type || d.type || 'Дедлайн')}</div>
-        </div>
-      `).join('');
+      container.innerHTML = deadlines.slice(0, 20).map(d => {
+        const link = d.Link || d.link || d.URL || '';
+        const points = d.Points || d.points || d.Credits || d.credits || '';
+        return `
+          <div class="card">
+            <h3>${escape(d.Subject || d.subject || 'Без предмета')}</h3>
+            <div class="card-meta"><strong>Задание:</strong> ${escape(d.Task || d.Task_Description || d.task || '—')}</div>
+            <div class="card-meta"><strong>📅 До:</strong> ${escape(d.Date || d.Deadline_Date || d.date || '—')}</div>
+            ${points ? `<div class="card-meta"><strong>🏆 Баллы / Кредиты:</strong> ${escape(points)}</div>` : ''}
+            ${link ? `<div style="margin-top: 12px;"><a href="${escape(link)}" target="_blank" style="display: inline-block; padding: 8px 14px; background: #667eea; color: white; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">🔗 Открыть ссылку</a></div>` : ''}
+          </div>
+        `;
+      }).join('');
     }
 
     // ===== ОТРИСОВКА СИЛЛАБУСА =====
@@ -540,7 +546,7 @@
         return;
       }
 
-      container.innerHTML = syllabus.slice(0, 12).map(s => `
+      container.innerHTML = syllabus.slice(0, 20).map(s => `
         <div class="card">
           <h3>${escape(s.Subject || s.subject || 'Без названия')}</h3>
           <div class="card-meta"><strong>Тема:</strong> ${escape(s.Topic || s.Theme || s.theme || '—')}</div>
@@ -548,6 +554,5 @@
       `).join('');
     }
 
-    // Запуск единой загрузки
     loadAllData();
-  </script>
+</script>
