@@ -68,7 +68,12 @@
       border: 1px solid var(--border);
     }
 
-    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .card-header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 8px; 
+    }
     
     .badge {
       font-size: 12px;
@@ -82,6 +87,32 @@
     .badge-capacity { background: #e8f5e9; color: #2e7d32; }
     .badge-full { background: #ffebee; color: #c62828; }
     .badge-week { background: #f3e5f5; color: #7b1fa2; }
+
+    /* Плашка отсчета дней по центру */
+    .badge-days {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: #e2e8f0;
+      color: #334155;
+      text-align: center;
+    }
+
+    .badge-days.urgent {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .badge-days.today {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-days.expired {
+      background: #f1f5f9;
+      color: #94a3b8;
+    }
 
     .card-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
     .card-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
@@ -197,6 +228,38 @@
       document.getElementById('syllabus-container').innerHTML = `<div class="error">${msg}</div>`;
     }
 
+    // Расчет оставшихся дней до даты
+    function getDaysRemainingBadge(dateStr) {
+      if (!dateStr || dateStr === 'Не указан' || dateStr === 'Дата не указана') return '';
+
+      let targetDate;
+      if (dateStr.includes('.')) {
+        const parts = dateStr.split('.');
+        if (parts.length === 3) targetDate = new Date(parts[2], parts[1] - 1, parts[0]);
+      } else {
+        targetDate = new Date(dateStr);
+      }
+
+      if (!targetDate || isNaN(targetDate.getTime())) return '';
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      targetDate.setHours(0, 0, 0, 0);
+
+      const diffTime = targetDate - today;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
+        return `<span class="badge-days expired">❌ Срок истёк</span>`;
+      } else if (diffDays === 0) {
+        return `<span class="badge-days today">⚠️ Сдача сегодня!</span>`;
+      } else if (diffDays <= 3) {
+        return `<span class="badge-days urgent">🔥 Осталось ${diffDays} дн.</span>`;
+      } else {
+        return `<span class="badge-days">⏳ Осталось ${diffDays} дн.</span>`;
+      }
+    }
+
     // 1. Отрисовка дедлайнов
     function renderDeadlines(items) {
       const container = document.getElementById('deadlines-container');
@@ -209,15 +272,19 @@
 
       container.innerHTML = activeItems.map(item => {
         const link = item.Link || item.Telegram_Msg_Link || '';
+        const rawDate = item.Date || item.Deadline_Date || 'Дата не указана';
+        const daysBadge = getDaysRemainingBadge(rawDate);
+
         return `
           <div class="card">
             <div class="card-header">
               <span class="badge">${esc(item.Subject || 'Общее')}</span>
+              ${daysBadge}
               <span class="badge" style="background:#fff3e0; color:#e65100">${esc(item.Type || 'Дедлайн')}</span>
             </div>
             <div class="card-title">${esc(item.Task || item.Task_Description || 'Без названия')}</div>
             <div class="card-footer">
-              <span>📅 <strong>${esc(item.Date || item.Deadline_Date || 'Дата не указана')}</strong></span>
+              <span>📅 <strong>${esc(rawDate)}</strong></span>
               ${link ? `<a href="${esc(link)}" target="_blank" class="btn-link">🔗 Задание</a>` : ''}
             </div>
           </div>
@@ -240,11 +307,14 @@
         const curCount = Number(item.Current_Count || 0);
         const members = item.Members ? String(item.Members).split(',').join(', ') : 'Пока нет участников';
         const isFull = curCount >= maxCap && maxCap > 0;
+        const deadline = item.Deadline || 'Не указан';
+        const daysBadge = getDaysRemainingBadge(deadline);
 
         return `
           <div class="card">
             <div class="card-header">
               <span class="badge">${esc(item.Subject || 'Предмет')}</span>
+              ${daysBadge}
               <span class="badge ${isFull ? 'badge-full' : 'badge-capacity'}">
                 👥 ${curCount} / ${maxCap} мест
               </span>
@@ -252,7 +322,7 @@
             <div class="card-title">${esc(item.Project_Name || 'Без названия')}</div>
             <div class="card-desc"><strong>Участники:</strong> ${esc(members)}</div>
             <div class="card-footer">
-              <span>📅 Дедлайн: <strong>${esc(item.Deadline || 'Не указан')}</strong></span>
+              <span>📅 Дедлайн: <strong>${esc(deadline)}</strong></span>
             </div>
           </div>
         `;
