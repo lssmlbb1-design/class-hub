@@ -151,27 +151,7 @@ function jsonResponse(obj) {
 /**
  * Обработчик всех входящих POST-запросов (Telegram Webhook + Сайт)
  */
-function doPost(e) {
-  try {
-    if (e && e.postData && e.postData.contents) {
-      const data = JSON.parse(e.postData.contents);
 
-      if (data.action === 'addProject') {
-        handleAddProject(data);
-      } else if (data.callback_query) {
-        handleInviteCallback(data.callback_query);
-      } else if (data.message) {
-        handleTextMessage(data.message);
-      }
-    }
-  } catch (err) {
-    Logger.log('❌ Ошибка в doPost: ' + err.toString());
-  }
-
-  // Обязательно возвращаем ContentService с пустым объектом {} и типом JSON
-  return ContentService.createTextOutput("{}")
-    .setMimeType(ContentService.MimeType.JSON);
-}
 
 /**
  * Установка Вебхука с очисткой зависших сообщений
@@ -200,24 +180,97 @@ function checkWebhookInfo() {
 // ============================================================
 // Text Message Handler (with admin commands)
 // ============================================================
+/**
+ * Обработчик всех входящих POST-запросов
+ */
+function doPost(e) {
+  try {
+    if (e && e.postData && e.postData.contents) {
+      const data = JSON.parse(e.postData.contents);
 
-function handleTextMessage(message) {
-  const chatId = message.chat.id;
-  const text = message.text || '';
+      // 1. Запрос с веб-сайта на добавление проекта
+      if (data.action === 'addProject') {
+        try {
+          handleAddProject(data);
+        } catch (errProject) {
+          Logger.log('❌ Ошибка handleAddProject: ' + errProject.toString());
+        }
+      } 
+      // 2. Нажатие инлайн-кнопок в Telegram
+      else if (data.callback_query) {
+        try {
+          handleInviteCallback(data.callback_query);
+        } catch (errCallback) {
+          Logger.log('❌ Ошибка handleInviteCallback: ' + errCallback.toString());
+        }
+      } 
+      // 3. Сообщения из чата Telegram
+      else if (data.message) {
+        try {
+          handleTextMessage(data.message);
+        } catch (errMessage) {
+          Logger.log('❌ Ошибка handleTextMessage: ' + errMessage.toString());
+        }
+      }
+    }
+  } catch (globalErr) {
+    Logger.log('❌ Глобальная ошибка doPost: ' + globalErr.toString());
+  }
 
-  // Тестовая эхо-отправка для проверки связи
-  const payload = {
-    chat_id: chatId,
-    text: "✅ Связь есть! Получено сообщение: " + text
-  };
-
-  UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload)
-  });
+  // Всегда возвращаем пустой HTML-вывод, чтобы Google не шёл на 302-редирект
+  return HtmlService.createHtmlOutput("");
 }
 
+/**
+ * Обработка текстовых сообщений из Telegram
+ */
+function handleTextMessage(message) {
+  const chatId = message.chat.id;
+  const text = (message.text || '').trim();
+
+  // Игнорируем пустые сообщения
+  if (!text) return;
+
+  // Если у вас есть функции поиска по таблице (например, findDeadlines, findSyllabus и т.д.):
+  // Вызывайте вашу рабочую логику обработчиков команд/вопросов здесь:
+  
+  let replyText = "";
+
+  // Пример обработки команд и поисковых запросов:
+  if (text.startsWith('/start') || text.startsWith('/help')) {
+    replyText = "👋 Привет! Я Class Hub бот.\nЗадайте вопрос по ДЗ, расписанию или дедлайнам!";
+  } else {
+    // Здесь вызывается ваша основная функция поиска по Google Таблице:
+    // (Замените processUserQuery на название вашей функции из code.js, если она называется иначе)
+    replyText = processUserQuery(text); 
+  }
+
+  // Если ответ сформирован — отправляем его в чат
+  if (replyText) {
+    sendMessage(chatId, replyText);
+  }
+}
+
+/**
+ * Вспомогательная функция отправки сообщений в Telegram
+ */
+function sendMessage(chatId, text) {
+  const url = 'https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage';
+  const payload = {
+    chat_id: chatId,
+    text: text,
+    parse_mode: 'HTML'
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  UrlFetchApp.fetch(url, options);
+}
 // ============================================================
 // Admin Commands Handler (= команды)
 // ============================================================
