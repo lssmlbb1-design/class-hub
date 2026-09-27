@@ -371,7 +371,7 @@
 
   <div class="toast" id="toast"></div>
 
-  <script>
+<script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzly3xaxSq1KoKpKKyuszspCnVfKc8zvmxrYMFQq1YTzqgEhXKOdkol4T95IrWdx2ff/exec";
     let currentProjectId = null;
 
@@ -380,42 +380,26 @@
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[c]));
 
-    // Извлечение массива из ответа Google Apps Script (учитывает вложенность data.data)
-    function extractPayload(rawData, key) {
-      if (Array.isArray(rawData)) return rawData;
-      if (rawData && rawData.data && Array.isArray(rawData.data[key])) return rawData.data[key];
-      if (rawData && Array.isArray(rawData[key])) return rawData[key];
-      if (rawData && rawData.data && Array.isArray(rawData.data)) return rawData.data;
-      return [];
-    }
-
     // ===== ВКЛАДКИ =====
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const tabName = e.target.dataset.tab;
-        
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        
         e.target.classList.add('active');
         $(tabName).classList.add('active');
       });
     });
 
     // ===== МОДАЛЬНОЕ ОКНО =====
-    function openModal() {
-      $('joinModal').classList.add('open');
-    }
-
+    function openModal() { $('joinModal').classList.add('open'); }
     function closeModal() {
       $('joinModal').classList.remove('open');
       $('studentName').value = '';$('studentTelegramId').value = '';
       currentProjectId = null;
     }
-
-    $('cancelBtn').addEventListener('click', closeModal);$('joinModal').addEventListener('click', (e) => {
-      if (e.target === $('joinModal')) closeModal();
-    });
+    $('cancelBtn').addEventListener('click', closeModal);
+    $('joinModal').addEventListener('click', (e) => { if (e.target ===$('joinModal')) closeModal(); });
 
     // ===== ОТПРАВКА ЗАЯВКИ =====
     $('submitJoinBtn').addEventListener('click', async () => {
@@ -428,7 +412,7 @@
       }
 
       try {
-        const response = await fetch(GAS_URL, {
+        await fetch(GAS_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
@@ -442,11 +426,10 @@
         closeModal();
         showToast('✅ Заявка отправлена лидеру проекта!');
       } catch (error) {
-        alert('❌ Ошибка отправки. Попробуйте позже.');
+        alert('❌ Ошибка отправки: ' + error.message);
       }
     });
 
-    // ===== УВЕДОМЛЕНИЯ =====
     function showToast(message) {
       const toast = $('toast');
       toast.textContent = message;
@@ -454,7 +437,44 @@
       setTimeout(() => toast.classList.remove('show'), 2500);
     }
 
-    // ===== ПРОЕКТЫ =====
+    // ===== ЕДИНАЯ ЗАГРУЗКА ВСЕХ ДАННЫХ =====
+    async function loadAllData() {
+      try {
+        const response = await fetch(GAS_URL);
+        if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
+        
+        const raw = await response.json();
+        console.log("Получены данные от сервера:", raw);
+
+        let projects = [], deadlines = [], syllabus = [];
+
+        if (Array.isArray(raw)) {
+          projects = raw;
+        } else if (raw.data) {
+          projects = raw.data.projects || [];
+          deadlines = raw.data.deadlines || [];
+          syllabus = raw.data.syllabus || [];
+        } else {
+          projects = raw.projects || [];
+          deadlines = raw.deadlines || [];
+          syllabus = raw.syllabus || [];
+        }
+
+        renderProjects(projects);
+        renderDeadlines(deadlines);
+        renderSyllabus(syllabus);
+
+      } catch (error) {
+        console.error("Критическая ошибка:", error);
+        const errHtml = `<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #742a2a; background: #fed7d7; border-radius: 8px;">
+          <strong>❌ Не удалось загрузить данные:</strong> ${escape(error.message)}<br>
+          <small>Проверьте, что в Google Apps Script доступ выставлен на "Все" (Anyone).</small>
+        </div>`;
+        $('projectsList').innerHTML = errHtml;
+      }
+    }
+
+    // ===== ОТРИСОВКА ПРОЕКТОВ =====
     function renderProjects(projects) {
       const container = $('projectsList');
       if (!Array.isArray(projects) || projects.length === 0) {
@@ -463,7 +483,6 @@
       }
 
       container.innerHTML = projects.map(p => {
-        // Поддержка полей таблицы (Project_Name, Subject, Max_Capacity...)
         const id = p.Project_ID || p.projectId || '';
         const name = p.Project_Name || p.projectName || 'Без названия';
         const subject = p.Subject || p.subject || '—';
@@ -486,8 +505,7 @@
             <div class="card-meta"><strong>📅 Дедлайн:</strong> ${escape(deadline)}</div>
             <div class="card-meta"><strong>👥 Свободно мест:</strong> ${available}/${maxCap}</div>
             <div class="members-box">
-              <strong>Участники:</strong>
-              ${membersStr}
+              <strong>Участники:</strong> ${membersStr}
             </div>
             <span class="status-badge active">Активный</span>
             <button class="join-btn" onclick="currentProjectId='${escape(id)}'; openModal();">Подать заявку</button>
@@ -496,20 +514,7 @@
       }).join('');
     }
 
-    async function loadProjects() {
-      try {
-        const response = await fetch(GAS_URL, { method: 'GET' });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const rawData = await response.json();
-        const projects = extractPayload(rawData, 'projects');
-        renderProjects(projects);
-      } catch (error) {
-        console.error('Ошибка загрузки проектов:', error);
-        renderProjects([]);
-      }
-    }
-
-    // ===== ДЕДЛАЙНЫ =====
+    // ===== ОТРИСОВКА ДЕДЛАЙНОВ =====
     function renderDeadlines(deadlines) {
       const container = $('deadlinesList');
       if (!Array.isArray(deadlines) || deadlines.length === 0) {
@@ -517,41 +522,17 @@
         return;
       }
 
-      container.innerHTML = deadlines.slice(0, 12).map(d => {
-        const subject = d.Subject || d.subject || 'Без предмета';
-        const task = d.Task_Name || d.Task || d.task || '—';
-        const date = d.Deadline_Date || d.Date || d.date || '—';
-        const type = d.Type || d.type || 'Дедлайн';
-        const points = d.Points || d.points;
-        const link = d.Link || d.link;
-
-        return `
-          <div class="card">
-            <h3>${escape(subject)}</h3>
-            <div class="card-meta"><strong>Задание:</strong> ${escape(task)}</div>
-            <div class="card-meta"><strong>📅 До:</strong> ${escape(date)}</div>
-            <div class="card-meta"><strong>Тип:</strong> ${escape(type)}</div>
-            ${points ? `<div class="card-meta"><strong>Баллы:</strong> ${escape(points)}</div>` : ''}
-            ${link ? `<div style="margin-top: 12px;"><a href="${escape(link)}" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">→ Открыть ссылку</a></div>` : ''}
-          </div>
-        `;
-      }).join('');
+      container.innerHTML = deadlines.slice(0, 12).map(d => `
+        <div class="card">
+          <h3>${escape(d.Subject || d.subject || 'Без предмета')}</h3>
+          <div class="card-meta"><strong>Задание:</strong> ${escape(d.Task_Name || d.Task || d.task || '—')}</div>
+          <div class="card-meta"><strong>📅 До:</strong> ${escape(d.Deadline_Date || d.Date || d.date || '—')}</div>
+          <div class="card-meta"><strong>Тип:</strong> ${escape(d.Type || d.type || 'Дедлайн')}</div>
+        </div>
+      `).join('');
     }
 
-    async function loadDeadlines() {
-      try {
-        const response = await fetch(GAS_URL, { method: 'GET' });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const rawData = await response.json();
-        const deadlines = extractPayload(rawData, 'deadlines');
-        renderDeadlines(deadlines);
-      } catch (error) {
-        console.error('Ошибка загрузки дедлайнов:', error);
-        renderDeadlines([]);
-      }
-    }
-
-    // ===== СИЛЛАБУС =====
+    // ===== ОТРИСОВКА СИЛЛАБУСА =====
     function renderSyllabus(syllabus) {
       const container = $('syllabusList');
       if (!Array.isArray(syllabus) || syllabus.length === 0) {
@@ -559,34 +540,14 @@
         return;
       }
 
-      container.innerHTML = syllabus.slice(0, 12).map(s => {
-        const subject = s.Subject || s.subject || 'Без названия';
-        const theme = s.Topic || s.Theme || s.theme || '—';
-
-        return `
-          <div class="card">
-            <h3>${escape(subject)}</h3>
-            <div class="card-meta"><strong>Тема:</strong> ${escape(theme)}</div>
-          </div>
-        `;
-      }).join('');
+      container.innerHTML = syllabus.slice(0, 12).map(s => `
+        <div class="card">
+          <h3>${escape(s.Subject || s.subject || 'Без названия')}</h3>
+          <div class="card-meta"><strong>Тема:</strong> ${escape(s.Topic || s.Theme || s.theme || '—')}</div>
+        </div>
+      `).join('');
     }
 
-    async function loadSyllabus() {
-      try {
-        const response = await fetch(GAS_URL, { method: 'GET' });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const rawData = await response.json();
-        const syllabus = extractPayload(rawData, 'syllabus');
-        renderSyllabus(syllabus);
-      } catch (error) {
-        console.error('Ошибка загрузки силлабуса:', error);
-        renderSyllabus([]);
-      }
-    }
-
-    // ===== ИНИЦИАЛИЗАЦИЯ =====
-    loadProjects();
-    loadDeadlines();
-    loadSyllabus();
+    // Запуск единой загрузки
+    loadAllData();
   </script>
