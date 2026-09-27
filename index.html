@@ -380,6 +380,15 @@
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[c]));
 
+    // Извлечение массива из ответа Google Apps Script (учитывает вложенность data.data)
+    function extractPayload(rawData, key) {
+      if (Array.isArray(rawData)) return rawData;
+      if (rawData && rawData.data && Array.isArray(rawData.data[key])) return rawData.data[key];
+      if (rawData && Array.isArray(rawData[key])) return rawData[key];
+      if (rawData && rawData.data && Array.isArray(rawData.data)) return rawData.data;
+      return [];
+    }
+
     // ===== ВКЛАДКИ =====
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -400,13 +409,11 @@
 
     function closeModal() {
       $('joinModal').classList.remove('open');
-      $('studentName').value = '';
-      $('studentTelegramId').value = '';
+      $('studentName').value = '';$('studentTelegramId').value = '';
       currentProjectId = null;
     }
 
-    $('cancelBtn').addEventListener('click', closeModal);
-    $('joinModal').addEventListener('click', (e) => {
+    $('cancelBtn').addEventListener('click', closeModal);$('joinModal').addEventListener('click', (e) => {
       if (e.target === $('joinModal')) closeModal();
     });
 
@@ -455,28 +462,47 @@
         return;
       }
 
-      container.innerHTML = projects.map(p => `
-        <div class="card">
-          <h3>${escape(p.projectName || 'Без названия')}</h3>
-          <div class="card-meta"><strong>📚 Предмет:</strong> ${escape(p.subject || '—')}</div>
-          <div class="card-meta"><strong>📅 Дедлайн:</strong> ${escape(p.deadline || '—')}</div>
-          <div class="card-meta"><strong>👥 Свободно:</strong> ${Number(p.availableSpots || 0)}/${Number(p.maxCapacity || 0)}</div>
-          <div class="members-box">
-            <strong>Участники:</strong>
-            ${Array.isArray(p.approvedMembers) && p.approvedMembers.length ? p.approvedMembers.map(m => escape(m)).join(', ') : 'Нет участников'}
+      container.innerHTML = projects.map(p => {
+        // Поддержка полей таблицы (Project_Name, Subject, Max_Capacity...)
+        const id = p.Project_ID || p.projectId || '';
+        const name = p.Project_Name || p.projectName || 'Без названия';
+        const subject = p.Subject || p.subject || '—';
+        const deadline = p.Deadline || p.deadline || '—';
+        const maxCap = Number(p.Max_Capacity || p.maxCapacity || 0);
+        const currCount = Number(p.Current_Count || p.currentCount || 1);
+        const available = Math.max(0, maxCap - currCount);
+        
+        let membersRaw = p.Approved_Members || p.approvedMembers || p.Members || '';
+        let membersArr = Array.isArray(membersRaw) 
+          ? membersRaw 
+          : String(membersRaw).split(',').map(m => m.trim()).filter(Boolean);
+
+        const membersStr = membersArr.length ? membersArr.map(m => escape(m)).join(', ') : 'Нет участников';
+
+        return `
+          <div class="card">
+            <h3>${escape(name)}</h3>
+            <div class="card-meta"><strong>📚 Предмет:</strong> ${escape(subject)}</div>
+            <div class="card-meta"><strong>📅 Дедлайн:</strong> ${escape(deadline)}</div>
+            <div class="card-meta"><strong>👥 Свободно мест:</strong> ${available}/${maxCap}</div>
+            <div class="members-box">
+              <strong>Участники:</strong>
+              ${membersStr}
+            </div>
+            <span class="status-badge active">Активный</span>
+            <button class="join-btn" onclick="currentProjectId='${escape(id)}'; openModal();">Подать заявку</button>
           </div>
-          <span class="status-badge active">Активный</span>
-          <button class="join-btn" onclick="currentProjectId='${escape(p.projectId)}'; openModal();">Подать заявку</button>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     async function loadProjects() {
       try {
         const response = await fetch(GAS_URL, { method: 'GET' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
-        const data = await response.json();
-        renderProjects(Array.isArray(data) ? data : data.projects || []);
+        const rawData = await response.json();
+        const projects = extractPayload(rawData, 'projects');
+        renderProjects(projects);
       } catch (error) {
         console.error('Ошибка загрузки проектов:', error);
         renderProjects([]);
@@ -491,24 +517,33 @@
         return;
       }
 
-      container.innerHTML = deadlines.slice(0, 12).map(d => `
-        <div class="card">
-          <h3>${escape(d.Subject || 'Без предмета')}</h3>
-          <div class="card-meta"><strong>Задание:</strong> ${escape(d.Task || '—')}</div>
-          <div class="card-meta"><strong>📅 До:</strong> ${escape(d.Date || '—')}</div>
-          <div class="card-meta"><strong>Тип:</strong> ${escape(d.Type || 'Дедлайн')}</div>
-          ${d.Points ? `<div class="card-meta"><strong>Баллы:</strong> ${escape(d.Points)}</div>` : ''}
-          ${d.Link ? `<div style="margin-top: 12px;"><a href="${escape(d.Link)}" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">→ Открыть ссылку</a></div>` : ''}
-        </div>
-      `).join('');
+      container.innerHTML = deadlines.slice(0, 12).map(d => {
+        const subject = d.Subject || d.subject || 'Без предмета';
+        const task = d.Task_Name || d.Task || d.task || '—';
+        const date = d.Deadline_Date || d.Date || d.date || '—';
+        const type = d.Type || d.type || 'Дедлайн';
+        const points = d.Points || d.points;
+        const link = d.Link || d.link;
+
+        return `
+          <div class="card">
+            <h3>${escape(subject)}</h3>
+            <div class="card-meta"><strong>Задание:</strong> ${escape(task)}</div>
+            <div class="card-meta"><strong>📅 До:</strong> ${escape(date)}</div>
+            <div class="card-meta"><strong>Тип:</strong> ${escape(type)}</div>
+            ${points ? `<div class="card-meta"><strong>Баллы:</strong> ${escape(points)}</div>` : ''}
+            ${link ? `<div style="margin-top: 12px;"><a href="${escape(link)}" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 600;">→ Открыть ссылку</a></div>` : ''}
+          </div>
+        `;
+      }).join('');
     }
 
     async function loadDeadlines() {
       try {
         const response = await fetch(GAS_URL, { method: 'GET' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
-        const data = await response.json();
-        const deadlines = data.deadlines || [];
+        const rawData = await response.json();
+        const deadlines = extractPayload(rawData, 'deadlines');
         renderDeadlines(deadlines);
       } catch (error) {
         console.error('Ошибка загрузки дедлайнов:', error);
@@ -524,20 +559,25 @@
         return;
       }
 
-      container.innerHTML = syllabus.slice(0, 12).map(s => `
-        <div class="card">
-          <h3>${escape(s.Subject || 'Без названия')}</h3>
-          <div class="card-meta"><strong>Тема:</strong> ${escape(s.Theme || '—')}</div>
-        </div>
-      `).join('');
+      container.innerHTML = syllabus.slice(0, 12).map(s => {
+        const subject = s.Subject || s.subject || 'Без названия';
+        const theme = s.Topic || s.Theme || s.theme || '—';
+
+        return `
+          <div class="card">
+            <h3>${escape(subject)}</h3>
+            <div class="card-meta"><strong>Тема:</strong> ${escape(theme)}</div>
+          </div>
+        `;
+      }).join('');
     }
 
     async function loadSyllabus() {
       try {
         const response = await fetch(GAS_URL, { method: 'GET' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
-        const data = await response.json();
-        const syllabus = data.syllabus || [];
+        const rawData = await response.json();
+        const syllabus = extractPayload(rawData, 'syllabus');
         renderSyllabus(syllabus);
       } catch (error) {
         console.error('Ошибка загрузки силлабуса:', error);
@@ -550,5 +590,3 @@
     loadDeadlines();
     loadSyllabus();
   </script>
-</body>
-</html>
