@@ -506,8 +506,8 @@ function handleJoinRequestForm(e) {
 
     if (leaderTelegramId) {
       const buttons = [[
-        { text: '✅ Принять', callback_data: 'app_' + requestId },
-        { text: '❌ Отклонить', callback_data: 'rej_' + requestId }
+        { text: '✅ Принять', callback_data: 'approve_' + requestId },
+        { text: '❌ Отклонить', callback_data: 'reject_' + requestId }
       ]];
 
       sendTelegramMessageWithButtons(
