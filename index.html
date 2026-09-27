@@ -380,6 +380,13 @@
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[c]));
 
+    // Функция для безопасного формирования Telegram-ссылки
+    function getTelegramUrl(tg) {
+      if (!tg) return null;
+      const cleanTg = String(tg).trim().replace(/^@/, '');
+      return cleanTg ? `https://t.me/${cleanTg}` : null;
+    }
+
     // ===== ВКЛАДКИ =====
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -398,46 +405,48 @@
       $('studentName').value = '';$('studentTelegramId').value = '';
       currentProjectId = null;
     }
-    $('cancelBtn').addEventListener('click', closeModal);
-    $('joinModal').addEventListener('click', (e) => { if (e.target ===$('joinModal')) closeModal(); });
+    if ($('cancelBtn'))$('cancelBtn').addEventListener('click', closeModal);
+    if ($('joinModal')) $('joinModal').addEventListener('click', (e) => { if (e.target ===$('joinModal')) closeModal(); });
 
-    // ===== ОТПРАВКА ЗАЯВКИ (БЕЗ CORS ОШИБКИ) =====
-    $('submitJoinBtn').addEventListener('click', async () => {
-      const studentName = $('studentName').value.trim();
-      const studentId = $('studentTelegramId').value.trim();
-      
-      if (!currentProjectId || !studentName || !studentId) {
-        alert('Пожалуйста, заполните все поля.');
-        return;
-      }
+    // ===== ОТПРАВКА ЗАЯВКИ =====
+    if ($('submitJoinBtn')) {$('submitJoinBtn').addEventListener('click', async () => {
+        const studentName = $('studentName').value.trim();
+        const studentId = $('studentTelegramId').value.trim();
+        
+        if (!currentProjectId || !studentName || !studentId) {
+          alert('Пожалуйста, заполните все поля.');
+          return;
+        }
 
-      $('submitJoinBtn').disabled = true;
-      $('submitJoinBtn').textContent = 'Отправка...';
+        $('submitJoinBtn').disabled = true;
+        $('submitJoinBtn').textContent = 'Отправка...';
 
-      try {
-        await fetch(GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'joinProjectRequest',
-            projectId: currentProjectId,
-            studentId: studentId,
-            studentName: studentName
-          })
-        });
+        try {
+          await fetch(GAS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'joinProjectRequest',
+              projectId: currentProjectId,
+              studentId: studentId,
+              studentName: studentName
+            })
+          });
 
-        closeModal();
-        showToast('✅ Заявка отправлена лидеру проекта!');
-      } catch (error) {
-        alert('❌ Ошибка отправки: ' + error.message);
-      } finally {
-        $('submitJoinBtn').disabled = false;
-        $('submitJoinBtn').textContent = 'Отправить';
-      }
-    });
+          closeModal();
+          showToast('✅ Заявка отправлена лидеру проекта!');
+        } catch (error) {
+          alert('❌ Ошибка отправки: ' + error.message);
+        } finally {
+          $('submitJoinBtn').disabled = false;
+          $('submitJoinBtn').textContent = 'Отправить';
+        }
+      });
+    }
 
     function showToast(message) {
       const toast = $('toast');
+      if (!toast) return;
       toast.textContent = message;
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 2500);
@@ -466,14 +475,14 @@
         renderSyllabus(syllabus);
 
       } catch (error) {
-        console.error("Критическая ошибка:", error);
+        console.error("Ошибка загрузки:", error);
         $('projectsList').innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #742a2a; background: #fed7d7; border-radius: 8px;">
           <strong>❌ Не удалось загрузить данные:</strong> ${escape(error.message)}
         </div>`;
       }
     }
 
-    // ===== ОТРИСОВКА ПРОЕКТОВ =====
+    // ===== 1. КАРТОЧКИ ПРОЕКТОВ (С ССЫЛКАМИ) =====
     function renderProjects(projects) {
       const container = $('projectsList');
       if (!Array.isArray(projects) || projects.length === 0) {
@@ -486,11 +495,15 @@
         const name = p.Project_Name || p.projectName || 'Без названия';
         const subject = p.Subject || p.subject || '—';
         const deadline = p.Deadline || p.deadline || '—';
-        const points = p.Points || p.points || p.Credits || '';
+        const points = p.Points || p.points || p.Credits || p.credits || '';
         const maxCap = Number(p.Max_Capacity || p.maxCapacity || 0);
         const currCount = Number(p.Current_Count || p.currentCount || 1);
         const available = Math.max(0, maxCap - currCount);
         
+        const leaderTg = p.Leader_Telegram_ID || p.leaderTelegramId || '';
+        const tgLink = getTelegramUrl(leaderTg);
+        const projectLink = p.Link || p.link || p.URL || p.url || '';
+
         let membersRaw = p.Approved_Members || p.approvedMembers || p.Members || '';
         let membersArr = Array.isArray(membersRaw) 
           ? membersRaw 
@@ -505,17 +518,24 @@
             <div class="card-meta"><strong>📅 Дедлайн:</strong> ${escape(deadline)}</div>
             ${points ? `<div class="card-meta"><strong>🏆 Баллы / Кредиты:</strong> ${escape(points)}</div>` : ''}
             <div class="card-meta"><strong>👥 Свободно мест:</strong> ${available}/${maxCap}</div>
-            <div class="members-box">
+            
+            <div class="members-box" style="margin-top: 10px; padding: 8px; background: #f7fafc; border-radius: 6px; font-size: 13px;">
               <strong>Участники:</strong> ${membersStr}
             </div>
-            <span class="status-badge active">Активный</span>
-            <button class="join-btn" onclick="currentProjectId='${escape(id)}'; openModal();">Подать заявку</button>
+
+            <!-- БЛОК ССЫЛОК -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
+              ${tgLink ? `<a href="${tgLink}" target="_blank" style="padding: 6px 12px; background: #209cee; color: white; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">💬 Лидер в TG</a>` : ''}
+              ${projectLink ? `<a href="${escape(projectLink)}" target="_blank" style="padding: 6px 12px; background: #48bb78; color: white; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">📁 ТЗ / Файлы</a>` : ''}
+            </div>
+
+            <button class="join-btn" style="margin-top: 12px;" onclick="currentProjectId='${escape(id)}'; openModal();">Подать заявку</button>
           </div>
         `;
       }).join('');
     }
 
-    // ===== ОТРИСОВКА ДЕДЛАЙНОВ ВМЕСТЕ С ССЫЛКАМИ И БАЛЛАМИ =====
+    // ===== 2. КАРТОЧКИ ДЕДЛАЙНОВ (С ССЫЛКАМИ) =====
     function renderDeadlines(deadlines) {
       const container = $('deadlinesList');
       if (!Array.isArray(deadlines) || deadlines.length === 0) {
@@ -524,21 +544,28 @@
       }
 
       container.innerHTML = deadlines.slice(0, 20).map(d => {
-        const link = d.Link || d.link || d.URL || '';
-        const points = d.Points || d.points || d.Credits || d.credits || '';
+        const link = d.Link || d.link || d.URL || d.url || d['Ссылка'] || '';
+        const points = d.Points || d.points || d.Credits || d.credits || d['Баллы'] || '';
         return `
           <div class="card">
-            <h3>${escape(d.Subject || d.subject || 'Без предмета')}</h3>
-            <div class="card-meta"><strong>Задание:</strong> ${escape(d.Task || d.Task_Description || d.task || '—')}</div>
-            <div class="card-meta"><strong>📅 До:</strong> ${escape(d.Date || d.Deadline_Date || d.date || '—')}</div>
+            <h3>${escape(d.Subject || d.subject || d['Предмет'] || 'Без предмета')}</h3>
+            <div class="card-meta"><strong>Задание:</strong> ${escape(d.Task || d.Task_Description || d.task || d['Задание'] || '—')}</div>
+            <div class="card-meta"><strong>📅 До:</strong> ${escape(d.Date || d.Deadline_Date || d.date || d['Срок'] || '—')}</div>
             ${points ? `<div class="card-meta"><strong>🏆 Баллы / Кредиты:</strong> ${escape(points)}</div>` : ''}
-            ${link ? `<div style="margin-top: 12px;"><a href="${escape(link)}" target="_blank" style="display: inline-block; padding: 8px 14px; background: #667eea; color: white; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">🔗 Открыть ссылку</a></div>` : ''}
+            
+            ${link ? `
+              <div style="margin-top: 14px;">
+                <a href="${escape(link)}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: #667eea; color: white; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; transition: background 0.2s;">
+                  🔗 Открыть задание
+                </a>
+              </div>
+            ` : ''}
           </div>
         `;
       }).join('');
     }
 
-    // ===== ОТРИСОВКА СИЛЛАБУСА =====
+    // ===== 3. КАРТОЧКИ СИЛЛАБУСА (С ССЫЛКАМИ) =====
     function renderSyllabus(syllabus) {
       const container = $('syllabusList');
       if (!Array.isArray(syllabus) || syllabus.length === 0) {
@@ -546,12 +573,22 @@
         return;
       }
 
-      container.innerHTML = syllabus.slice(0, 20).map(s => `
-        <div class="card">
-          <h3>${escape(s.Subject || s.subject || 'Без названия')}</h3>
-          <div class="card-meta"><strong>Тема:</strong> ${escape(s.Topic || s.Theme || s.theme || '—')}</div>
-        </div>
-      `).join('');
+      container.innerHTML = syllabus.slice(0, 20).map(s => {
+        const link = s.Link || s.link || s.URL || s.url || s['Ссылка'] || '';
+        return `
+          <div class="card">
+            <h3>${escape(s.Subject || s.subject || s['Предмет'] || 'Без названия')}</h3>
+            <div class="card-meta"><strong>Тема:</strong> ${escape(s.Topic || s.Theme || s.theme || s['Тема'] || '—')}</div>
+            ${link ? `
+              <div style="margin-top: 14px;">
+                <a href="${escape(link)}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: #ED8936; color: white; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
+                  📚 Материалы лекции
+                </a>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
     }
 
     loadAllData();
