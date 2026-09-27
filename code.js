@@ -71,6 +71,32 @@ function doPost(e) {
     return HtmlService.createHtmlOutput('ERROR');
   }
 }
+function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAMES.projects); // Проверьте, что имя листа совпадает 1 в 1!
+    
+    if (!sheet) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "error",
+        message: "Лист не найден"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    // Дальнейшая сборка JSON...
+
+    return ContentService.createTextOutput(JSON.stringify(projects))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    // ЗАЩИТА ОТ ПАДЕНИЯ: возвращаем ошибку в JSON, а не ломаем выполнение
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      error: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
 
 function handleTextMessage(message) {
   try {
@@ -320,27 +346,200 @@ function handleRejectRequest(requestId, userId, callbackId) {
 // 2. Google Forms processing
 // ============================================================
 
+/**
+ * ============================================================
+ *  УНИВЕРСАЛЬНЫЙ ОБРАБОТЧИК ФОРМ (При отправке формы)
+ * ============================================================
+ */
+
 function onFormSubmit(e) {
   try {
-    if (!e || !e.source) return;
-
-    const form = FormApp.openById(e.source.getId());
-    const title = form.getTitle();
-
-    Logger.log('📋 Получена форма: ' + title);
-
-    if (title.indexOf(FORM_TITLES.adminForm) !== -1) {
-      handleAdminForm(e);
-    } else if (title.indexOf(FORM_TITLES.studentForm) !== -1) {
-      handleStudentForm(e);
-    } else if (title.indexOf(FORM_TITLES.joinRequestForm) !== -1) {
-      handleJoinRequestForm(e);
-    } else {
-      Logger.log('⚠️ Неизвестная форма: ' + title);
+    if (!e) {
+      Logger.log('⚠️ onFormSubmit: событие e не получено. Функция должна запускаться только триггером.');
+      return;
     }
-  } catch (error) {
-    Logger.log('❌ Ошибка onFormSubmit: ' + error.toString());
+
+    Logger.log('=== onFormSubmit: событие получено ===');
+    const sheetName = (e.range && e.range.getSheet) ? e.range.getSheet().getName() : '';
+    Logger.log('Ответ пришел на лист: "' + sheetName + '"');
+
+    // 1. Извлекаем ответы из формы по ключам и значениям
+    const answers = parseFormAnswers(e);
+    Logger.log('Распознанные ответы: ' + JSON.stringify(answers));
+
+    // Блокировка от гонок при одновременной отправке нескольких форм
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(10000)) {
+      throw new Error('Не удалось получить блокировку потока (таймаут 10 сек).');
+    }
+
+    try {
+      // 2. ОПРЕДЕЛЯЕМ ТИП ФОРМЫ И ВЫЗЫВАЕМ НУЖНЫЙ СЦЕНАРИЙ
+
+      // А) Это ЗАЯВКА НА ВСТУПЛЕНИЕ в проект?
+      if (answers.isJoinRequest || answers.project_id) {
+        handleJoinRequestSubmission(answers);
+        return;
+      }
+
+      // Б) Это СОЗДАНИЕ ПРОЕКТА (Студент или Админ)?
+      if (answers.project_name) {
+        handleProjectCreationSubmission(answers, sheetName);
+        return;
+      }
+
+      Logger.log('⚠️ Предупреждение: Не удалось определить тип формы.');
+
+    } finally {
+      lock.releaseLock();
+    }
+
+  } catch (err) {
+    Logger.log('❌ КРИТИЧЕСКАЯ ОШИБКА onFormSubmit: ' + err.toString() + '\nStack: ' + err.stack);
   }
+}
+
+/**
+ * --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ОБРАБОТКИ ---
+ */
+
+// 1. Обработка создания нового проекта (Студенческого или Админского)
+function handleProjectCreationSubmission(answers, sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetProjects = ss.getSheetByName('Projects');
+  if (!sheetProjects) throw new Error('Лист "Projects" не найден!');
+
+  const projectId = generateNextProjectId(sheetProjects);
+  const isStudent = sheetName.toLowerCase().includes('raw') || answers.leader_tg !== '';
+
+  const newRow = [
+    projectId,                                // Project_ID (PRJ-001)
+    answers.project_name,                     // Project_Name
+    answers.subject || '—',                    // Subject
+    Number(answers.max_capacity) || 4,        // Max_Capacity
+    1,                                        // Current_Count (создатель/лидер внутри)
+    answers.leader_tg || 'ADMIN',             // Leader_Telegram_ID
+    answers.leader_tg || 'ADMIN',             // Approved_Members
+    answers.deadline || '30.12.2026',         // Deadline
+    'Active'                                  // Status
+  ];
+
+  sheetProjects.appendRow(newRow);
+  Logger.log('✅ Проект ' + projectId + ' успешно добавлен в Projects!');
+}
+
+// 2. Обработка заявки студента на вступление в команду
+function handleJoinRequestSubmission(answers) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetRequests = ss.getSheetByName('Join_Requests');
+  if (!sheetRequests) throw new Error('Лист "Join_Requests" не найден!');
+
+  const requestId = 'REQ-' + String(sheetRequests.getLastRow()).padStart(3, '0');
+
+  const newRow = [
+    requestId,                                // Request_ID
+    answers.project_id,                       // Project_ID
+    answers.student_tg,                       // Student_Telegram_ID
+    answers.student_name || 'Студент',         // Student_Name
+    'Pending'                                 // Status
+  ];
+
+  sheetRequests.appendRow(newRow);
+  Logger.log('✅ Заявка ' + requestId + ' добавлена в Join_Requests!');
+
+  // Отправка уведомления Лидеру в Telegram
+  notifyLeaderAboutRequest(answers.project_id, requestId, answers.student_tg, answers.student_name);
+}
+
+// 3. Отправка сообщения Лидеру команды в Telegram
+function notifyLeaderAboutRequest(projectId, requestId, studentTg, studentName) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetProjects = ss.getSheetByName('Projects');
+    const data = sheetProjects.getDataRange().getValues();
+
+    // Ищем проект и ID его лидера
+    let leaderId = null;
+    let projectName = projectId;
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(projectId).trim()) {
+        projectName = data[i][1];
+        leaderId = data[i][5]; // Leader_Telegram_ID
+        break;
+      }
+    }
+
+    if (!leaderId || leaderId === 'ADMIN') {
+      Logger.log('Уведомление не отправлено: у проекта ' + projectId + ' нет Telegram ID лидера.');
+      return;
+    }
+
+    const message = `📥 <b>Новая заявка в вашу команду!</b>\n\n` +
+                    `📌 <b>Проект:</b> ${projectName} (${projectId})\n` +
+                    `👤 <b>Заявитель:</b> ${studentName} (ID: <code>${studentTg}</code>)\n\n` +
+                    `Принять студента в команду?`;
+
+    const buttons = {
+      inline_keyboard: [[
+        { text: "✅ Принять", callback_data: "app_" + requestId },
+        { text: "❌ Отклонить", callback_data: "rej_" + requestId }
+      ]]
+    };
+
+    // Вызов функции отправки в Telegram (из вашего основного code.js)
+    if (typeof sendTelegramMessage === 'function') {
+      sendTelegramMessage(leaderId, message, buttons);
+    }
+
+  } catch (err) {
+    Logger.log('❌ Ошибка отправки уведомления лидеру: ' + err.toString());
+  }
+}
+
+// 4. Парсинг ответов формы по названию вопросов
+function parseFormAnswers(e) {
+  const result = {
+    project_name: '', subject: '', max_capacity: '', leader_tg: '',
+    deadline: '', project_id: '', student_tg: '', student_name: ''
+  };
+
+  if (!e || !e.namedValues) return result;
+
+  Object.keys(e.namedValues).forEach(key => {
+    const k = key.toLowerCase().trim();
+    const val = String(e.namedValues[key][0] || '').trim();
+
+    if (k.includes('название') || k.includes('проект')) result.project_name = val;
+    if (k.includes('предмет') || k.includes('дисциплина')) result.subject = val;
+    if (k.includes('мест') || k.includes('capacity')) result.max_capacity = val;
+    if (k.includes('лидер') || (k.includes('telegram') && !k.includes('студент'))) result.leader_tg = val.replace('@', '');
+    if (k.includes('дедлайн') || k.includes('срок')) result.deadline = val;
+    if (k.includes('код проекта') || k.includes('prj-')) result.project_id = val.toUpperCase();
+    if (k.includes('ваш telegram') || k.includes('id студента')) result.student_tg = val.replace('@', '');
+    if (k.includes('имя') || k.includes('фио')) result.student_name = val;
+  });
+
+  return result;
+}
+
+// 5. Генерация ID для проекта (PRJ-001, PRJ-002...)
+function generateNextProjectId(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 'PRJ-001';
+
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  let maxNum = 0;
+
+  ids.forEach(row => {
+    const match = String(row[0]).match(/PRJ-(\d+)/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  });
+
+  return 'PRJ-' + String(maxNum + 1).padStart(3, '0');
 }
 
 function handleAdminForm(e) {
@@ -1165,4 +1364,63 @@ function updateFormProjectOptions() {
 
 // ============================================================
 // End of file
-// ============================================================
+// ====================================
+
+
+
+
+/**
+ * Функция однократной настройки структуры Google Таблицы.
+ * Создаёт нужные листы, прописывает заголовки, закрепляет и форматирует первые строки.
+ */
+function setupSpreadsheetStructure() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. Настройка листа Projects (Основной реестр проектов)
+  let projectsSheet = ss.getSheetByName("Projects") || ss.insertSheet("Projects");
+  const projectsHeaders = [
+    "Project_ID", 
+    "Project_Name", 
+    "Subject", 
+    "Max_Capacity", 
+    "Current_Count", 
+    "Leader_Telegram_ID", 
+    "Approved_Members", 
+    "Deadline", 
+    "Status"
+  ];
+  setHeadersIfEmpty(projectsSheet, projectsHeaders);
+
+  // 2. Настройка листа Join_Requests (Заявки студентов на вступление)
+  let requestsSheet = ss.getSheetByName("Join_Requests") || ss.insertSheet("Join_Requests");
+  const requestsHeaders = [
+    "Request_ID", 
+    "Project_ID", 
+    "Student_Telegram_ID", 
+    "Student_Name", 
+    "Status"
+  ];
+  setHeadersIfEmpty(requestsSheet, requestsHeaders);
+
+  // 3. Настройка листа Admin_IDs (Список Telegram ID администраторов)
+  let adminSheet = ss.getSheetByName("Admin_IDs") || ss.insertSheet("Admin_IDs");
+  const adminHeaders = ["Telegram_ID"];
+  setHeadersIfEmpty(adminSheet, adminHeaders);
+
+  Logger.log("✅ Все рабочие листы успешно созданы и подготовлены!");
+}
+
+/**
+ * Вспомогательная функция установки и форматирования заголовков
+ */
+function setHeadersIfEmpty(sheet, headersArray) {
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headersArray.length).setValues([headersArray]);
+  }
+  
+  // Красивое форматирование первой строки
+  const headerRange = sheet.getRange(1, 1, 1, headersArray.length);
+  headerRange.setFontWeight("bold");
+  headerRange.setBackground("#EFEFEF");
+  sheet.setFrozenRows(1);
+}
