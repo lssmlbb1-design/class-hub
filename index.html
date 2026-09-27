@@ -1,367 +1,348 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Class Hub</title>
   <style>
-    :root {
-      --primary: #0088cc;
-      --bg: #f4f6f8;
-      --card-bg: #ffffff;
-      --text: #1a1a1a;
-      --text-muted: #666666;
-      --border: #e2e8f0;
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f7fb;
+      margin: 0;
+      padding: 24px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); padding-bottom: 40px; }
-
-    header {
-      background: var(--card-bg);
-      padding: 16px;
-      text-align: center;
-      border-bottom: 1px solid var(--border);
-      position: sticky;
-      top: 0;
-      z-index: 100;
+    .projects {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      max-width: 1100px;
+      margin: 0 auto;
     }
 
-    header h1 { font-size: 20px; color: var(--primary); }
-
-    nav {
-      display: flex;
-      justify-content: center;
-      gap: 8px;
-      background: var(--card-bg);
-      padding: 8px;
-      border-bottom: 1px solid var(--border);
+    .project-card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+      padding: 20px;
+      border: 1px solid #e5e7eb;
     }
 
-    .tab-btn {
-      background: none;
-      border: none;
-      padding: 8px 16px;
+    .project-card h3 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    .meta {
+      color: #475569;
+      line-height: 1.6;
+      margin: 6px 0;
+    }
+
+    .members {
+      margin-top: 12px;
       font-size: 14px;
-      font-weight: 500;
-      color: var(--text-muted);
-      border-radius: 20px;
+      color: #334155;
+      background: #f8fafc;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .join-btn {
+      margin-top: 16px;
+      width: 100%;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 15px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .join-btn:hover {
+      background: #1d4ed8;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-content {
+      width: min(420px, 90vw);
+      background: white;
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.15);
+    }
+
+    .modal-content h2 {
+      margin-top: 0;
+      margin-bottom: 18px;
+      font-size: 26px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 15px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 6px;
+    }
+
+    .secondary, .primary {
+      border: none;
+      border-radius: 10px;
+      padding: 11px 16px;
+      font-weight: 600;
       cursor: pointer;
     }
 
-    .tab-btn.active {
-      background: var(--primary);
-      color: #fff;
-    }
-
-    main { max-width: 600px; margin: 16px auto; padding: 0 16px; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    /* Cards */
-    .card {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-      border: 1px solid var(--border);
-    }
-
-    .card-header { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      margin-bottom: 8px; 
-    }
-    
-    .badge {
-      font-size: 12px;
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-weight: 600;
-      background: #e3f2fd;
-      color: #0d47a1;
-    }
-
-    .badge-capacity { background: #e8f5e9; color: #2e7d32; }
-    .badge-full { background: #ffebee; color: #c62828; }
-    .badge-week { background: #f3e5f5; color: #7b1fa2; }
-
-    /* Плашка отсчета дней по центру */
-    .badge-days {
-      font-size: 12px;
-      font-weight: 700;
-      padding: 3px 10px;
-      border-radius: 12px;
+    .secondary {
       background: #e2e8f0;
-      color: #334155;
-      text-align: center;
+      color: #0f172a;
     }
 
-    .badge-days.urgent {
-      background: #fee2e2;
-      color: #991b1b;
+    .primary {
+      background: #10b981;
+      color: white;
     }
 
-    .badge-days.today {
-      background: #fef3c7;
-      color: #92400e;
-    }
-
-    .badge-days.expired {
-      background: #f1f5f9;
-      color: #94a3b8;
-    }
-
-    .card-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
-    .card-desc { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
-
-    .card-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 8px;
-      border-top: 1px solid var(--border);
-      font-size: 13px;
-    }
-
-    .btn-link {
-      background: var(--primary);
-      color: #fff !important;
-      text-decoration: none;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-    }
-
-    /* States */
-    .loading, .error, .empty {
-      text-align: center;
-      padding: 32px 16px;
-      color: var(--text-muted);
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #0f172a;
+      color: white;
+      padding: 12px 18px;
+      border-radius: 10px;
       font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 30;
     }
-    .error { color: #d32f2f; }
+
+    .toast.show {
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
+  <div class="projects" id="projectsList"></div>
 
-  <header>
-    <h1>Class Hub</h1>
-  </header>
+  <div class="modal" id="joinModal">
+    <div class="modal-content">
+      <h2>Подать заявку</h2>
 
-  <nav>
-    <button class="tab-btn active" data-tab="deadlines">📅 Дедлайны</button>
-    <button class="tab-btn" data-tab="projects">👥 Проекты</button>
-    <button class="tab-btn" data-tab="syllabus">📚 Силлабус</button>
-  </nav>
+      <label for="studentName">Имя</label>
+      <input id="studentName" type="text" placeholder="Иван" />
 
-  <main>
-    <section id="deadlines" class="tab-content active">
-      <div id="deadlines-container" class="loading">Загрузка данных...</div>
-    </section>
+      <label for="studentTelegramId">Telegram ID или @username</label>
+      <input id="studentTelegramId" type="text" placeholder="123456789 или @ivan" />
 
-    <section id="projects" class="tab-content">
-      <div id="projects-container" class="loading">Загрузка данных...</div>
-    </section>
+      <div class="actions">
+        <button class="secondary" id="cancelBtn">Отмена</button>
+        <button class="primary" id="submitJoinBtn">Отправить заявку</button>
+      </div>
+    </div>
+  </div>
 
-    <section id="syllabus" class="tab-content">
-      <div id="syllabus-container" class="loading">Загрузка данных...</div>
-    </section>
-  </main>
+  <div class="toast" id="toast"></div>
 
   <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbwMXejYR6g5kbdsNO_AS5MvUvI_OWRG3M9Z486-AiyImYXUCyCtB9zWm245JpCRvKQIkg/exec';
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbz.../exec'; // <-- ваш URL Apps Script
+    let currentProjectId = null;
 
-    document.addEventListener('DOMContentLoaded', () => {
-      setupTabs();
-      loadAllData();
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadProjects();
+      bindModalEvents();
     });
 
-    function setupTabs() {
-      const buttons = document.querySelectorAll('.tab-btn');
-      const contents = document.querySelectorAll('.tab-content');
+    async function loadProjects() {
+      try {
+        const response = await fetch(`${GAS_URL}?action=getProjects`, {
+          method: 'GET',
+          mode: 'cors'
+        });
 
-      buttons.forEach(btn => {
+        if (!response.ok) {
+          throw new Error('Ошибка загрузки проектов');
+        }
+
+        const projects = await response.json();
+
+        renderProjects(projects);
+      } catch (error) {
+        console.error(error);
+        document.getElementById('projectsList').innerHTML =
+          '<div class="project-card"><h3>Ошибка</h3><div class=\"meta\">Не удалось загрузить проекты.</div></div>';
+      }
+    }
+
+    function renderProjects(projects) {
+      const container = document.getElementById('projectsList');
+
+      if (!projects || projects.length === 0) {
+        container.innerHTML = '<div class="project-card"><h3>Проекты</h3><div class="meta">Активных проектов пока нет.</div></div>';
+        return;
+      }
+
+      container.innerHTML = '';
+
+      projects.forEach((project) => {
+        const card = document.createElement('div');
+        card.className = 'project-card';
+
+        const members = Array.isArray(project.approvedMembers) && project.approvedMembers.length
+          ? project.approvedMembers.join(', ')
+          : 'Нет участников';
+
+        const free = Number(project.availableSpots || 0);
+        const total = Number(project.maxCapacity || 0);
+
+        card.innerHTML = `
+          <h3>${escapeHtml(project.projectName || 'Без названия')}</h3>
+          <div class="meta"><strong>Предмет:</strong> ${escapeHtml(project.subject || '—')}</div>
+          <div class="meta"><strong>Дедлайн:</strong> ${escapeHtml(project.deadline || '—')}</div>
+          <div class="meta"><strong>Свободно:</strong> ${free}/${total}</div>
+
+          <div class="members">
+            <strong>Участники:</strong><br>
+            ${escapeHtml(members)}
+          </div>
+
+          <button class="join-btn" data-project-id="${project.projectId}">
+            Подать заявку на участие
+          </button>
+        `;
+
+        container.appendChild(card);
+      });
+
+      document.querySelectorAll('.join-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const target = btn.dataset.tab;
-
-          buttons.forEach(b => b.classList.remove('active'));
-          contents.forEach(c => c.classList.remove('active'));
-
-          btn.classList.add('active');
-          const activeContent = document.getElementById(target);
-          if (activeContent) activeContent.classList.add('active');
+          currentProjectId = btn.dataset.projectId;
+          openModal();
         });
       });
     }
 
-    async function loadAllData() {
+    function bindModalEvents() {
+      document.getElementById('cancelBtn').addEventListener('click', closeModal);
+      document.getElementById('submitJoinBtn').addEventListener('click', sendJoinRequest);
+      document.getElementById('joinModal').addEventListener('click', (e) => {
+        if (e.target.id === 'joinModal') closeModal();
+      });
+    }
+
+    function openModal() {
+      document.getElementById('joinModal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('joinModal').classList.remove('open');
+      document.getElementById('studentName').value = '';
+      document.getElementById('studentTelegramId').value = '';
+      currentProjectId = null;
+    }
+
+    async function sendJoinRequest() {
+      const studentName = document.getElementById('studentName').value.trim();
+      const studentTelegramId = document.getElementById('studentTelegramId').value.trim();
+
+      if (!currentProjectId) {
+        alert('Выберите проект.');
+        return;
+      }
+
+      if (!studentName || !studentTelegramId) {
+        alert('Введите имя и Telegram ID.');
+        return;
+      }
+
+      const payload = {
+        action: 'joinProjectRequest',
+        projectId: currentProjectId,
+        studentId: studentTelegramId,
+        studentName: studentName
+      };
+
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
 
-        const response = await fetch(`${API_URL}?action=getAll`, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        const result = await response.json();
-
-        if (!result.ok || !result.data) {
-          showError('Не удалось загрузить данные из таблицы.');
-          return;
+        const text = await response.text();
+        let data = {};
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = { ok: false, error: text };
         }
 
-        renderDeadlines(result.data.deadlines || []);
-        renderProjects(result.data.projects || []);
-        renderSyllabus(result.data.syllabus || []);
+        if (!response.ok || data.ok === false) {
+          throw new Error(data.error || 'Не удалось отправить заявку.');
+        }
 
-      } catch (err) {
-        console.error('Data load error:', err);
-        showError(err.name === 'AbortError' ? '⏱️ Сервер отвечает слишком долго. Попробуйте обновить.' : '❌ Ошибка сети при загрузке.');
+        showToast('Заявка отправлена лидеру!');
+        closeModal();
+      } catch (error) {
+        console.error(error);
+        alert(error.message || 'Ошибка отправки заявки.');
       }
     }
 
-    function showError(msg) {
-      document.getElementById('deadlines-container').innerHTML = `<div class="error">${msg}</div>`;
-      document.getElementById('projects-container').innerHTML = `<div class="error">${msg}</div>`;
-      document.getElementById('syllabus-container').innerHTML = `<div class="error">${msg}</div>`;
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
     }
 
-    // Расчет оставшихся дней до даты
-    function getDaysRemainingBadge(dateStr) {
-      if (!dateStr || dateStr === 'Не указан' || dateStr === 'Дата не указана') return '';
-
-      let targetDate;
-      if (dateStr.includes('.')) {
-        const parts = dateStr.split('.');
-        if (parts.length === 3) targetDate = new Date(parts[2], parts[1] - 1, parts[0]);
-      } else {
-        targetDate = new Date(dateStr);
-      }
-
-      if (!targetDate || isNaN(targetDate.getTime())) return '';
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      targetDate.setHours(0, 0, 0, 0);
-
-      const diffTime = targetDate - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays < 0) {
-        return `<span class="badge-days expired">❌ Срок истёк</span>`;
-      } else if (diffDays === 0) {
-        return `<span class="badge-days today">⚠️ Сдача сегодня!</span>`;
-      } else if (diffDays <= 3) {
-        return `<span class="badge-days urgent">🔥 Осталось ${diffDays} дн.</span>`;
-      } else {
-        return `<span class="badge-days">⏳ Осталось ${diffDays} дн.</span>`;
-      }
-    }
-
-    // 1. Отрисовка дедлайнов
-    function renderDeadlines(items) {
-      const container = document.getElementById('deadlines-container');
-      const activeItems = items.filter(i => String(i.Status || '').toLowerCase() !== 'expired');
-
-      if (!activeItems.length) {
-        container.innerHTML = '<div class="empty">Актуальных дедлайнов нет 🎉</div>';
-        return;
-      }
-
-      container.innerHTML = activeItems.map(item => {
-        const link = item.Link || item.Telegram_Msg_Link || '';
-        const rawDate = item.Date || item.Deadline_Date || 'Дата не указана';
-        const daysBadge = getDaysRemainingBadge(rawDate);
-
-        return `
-          <div class="card">
-            <div class="card-header">
-              <span class="badge">${esc(item.Subject || 'Общее')}</span>
-              ${daysBadge}
-              <span class="badge" style="background:#fff3e0; color:#e65100">${esc(item.Type || 'Дедлайн')}</span>
-            </div>
-            <div class="card-title">${esc(item.Task || item.Task_Description || 'Без названия')}</div>
-            <div class="card-footer">
-              <span>📅 <strong>${esc(rawDate)}</strong></span>
-              ${link ? `<a href="${esc(link)}" target="_blank" class="btn-link">🔗 Задание</a>` : ''}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // 2. Отрисовка проектов
-    function renderProjects(items) {
-      const container = document.getElementById('projects-container');
-      const activeItems = items.filter(i => String(i.Status || '').toLowerCase() !== 'expired');
-
-      if (!activeItems.length) {
-        container.innerHTML = '<div class="empty">Список проектов пуст 🎉</div>';
-        return;
-      }
-
-      container.innerHTML = activeItems.map(item => {
-        const maxCap = Number(item.Max_Capacity || 0);
-        const curCount = Number(item.Current_Count || 0);
-        const members = item.Members ? String(item.Members).split(',').join(', ') : 'Пока нет участников';
-        const isFull = curCount >= maxCap && maxCap > 0;
-        const deadline = item.Deadline || 'Не указан';
-        const daysBadge = getDaysRemainingBadge(deadline);
-
-        return `
-          <div class="card">
-            <div class="card-header">
-              <span class="badge">${esc(item.Subject || 'Предмет')}</span>
-              ${daysBadge}
-              <span class="badge ${isFull ? 'badge-full' : 'badge-capacity'}">
-                👥 ${curCount} / ${maxCap} мест
-              </span>
-            </div>
-            <div class="card-title">${esc(item.Project_Name || 'Без названия')}</div>
-            <div class="card-desc"><strong>Участники:</strong> ${esc(members)}</div>
-            <div class="card-footer">
-              <span>📅 Дедлайн: <strong>${esc(deadline)}</strong></span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    // 3. Отрисовка Силлабуса
-    function renderSyllabus(items) {
-      const container = document.getElementById('syllabus-container');
-
-      if (!items.length) {
-        container.innerHTML = '<div class="empty">Силлабус пока не заполнен 🎉</div>';
-        return;
-      }
-
-      container.innerHTML = items.map(item => {
-        const week = item.Week || item.Module || '';
-        const link = item.Link || item.Materials_Link || '';
-
-        return `
-          <div class="card">
-            <div class="card-header">
-              <span class="badge">${esc(item.Subject || 'Предмет')}</span>
-              ${week ? `<span class="badge badge-week">Неделя/Модуль: ${esc(week)}</span>` : ''}
-            </div>
-            <div class="card-title">${esc(item.Topic || item.Title || 'Без темы')}</div>
-            ${item.Description ? `<div class="card-desc">${esc(item.Description)}</div>` : ''}
-            <div class="card-footer">
-              ${link ? `<a href="${esc(link)}" target="_blank" class="btn-link">📁 Материалы занятий</a>` : '<span></span>'}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function esc(str) {
-      return String(str || '').replace(/[&<>"']/g, m => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-      }[m]));
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
     }
   </script>
 </body>
