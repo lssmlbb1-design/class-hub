@@ -384,35 +384,94 @@
       });
   }
 
-  function loadProjects() {
-    if (requestInFlight) return;
-    requestInFlight = true;
-    document.getElementById('error-slot').innerHTML = '';
-    document.getElementById('groups-list').innerHTML = projectSkeletons();
-    if (tg && tg.MainButton) tg.MainButton.showProgress();
+  async function loadProjects() {
+  const container = document.getElementById('projects-container');
+  if (!container) return;
 
-    fetch(API_URL + '?action=getProjectsWithStudents')
-      .then(function (res) {
-        if (!res.ok) throw new Error('Ошибка сети: ' + res.status);
-        return res.json();
-      })
-      .then(function (json) {
-        if (!json.ok) throw new Error(json.error || 'Неизвестная ошибка API');
-        if (!json.data || typeof json.data !== 'object') throw new Error('API вернуло данные в неверном формате');
-        state.projects = Array.isArray(json.data.projects) ? json.data.projects : [];
-        renderProjects(document.getElementById('group-search').value.trim());
-        hasLoadedData = true;
-      })
-      .catch(function (err) {
-        document.getElementById('error-slot').innerHTML =
-          '<div class="glass rounded-xl p-3 mb-3 text-[13px] text-rose-300" style="border-color: rgba(251,113,133,0.25);">Не удалось загрузить проекты: ' + escapeHTML(err.message) + '</div>';
-        document.getElementById('groups-list').innerHTML = emptyState('Нет данных о проектах.');
-      })
-      .finally(function () {
-        requestInFlight = false;
-        if (tg && tg.MainButton) tg.MainButton.hideProgress();
-      });
+  container.innerHTML = '<div class="loading">Загрузка проектов...</div>';
+
+  try {
+    // Устанавливаем таймаут запроса, чтобы сайт не вис бесконечно
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд max
+
+    const response = await fetch(`${API_URL}?action=getProjects`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    const result = await response.json();
+
+    if (!result.ok || !result.data || !result.data.projects) {
+      container.innerHTML = '<div class="error">⚠️ Не удалось получить список проектов. Проверьте вкладку Projects в Google Таблице.</div>';
+      return;
+    }
+
+    renderProjects(result.data.projects);
+
+  } catch (err) {
+    console.error('Projects load error:', err);
+    if (err.name === 'AbortError') {
+      container.innerHTML = '<div class="error">⏱️ Сервер отвечает слишком долго. Попробуйте обновить страницу.</div>';
+    } else {
+      container.innerHTML = '<div class="error">❌ Ошибка сети при загрузке проектов.</div>';
+    }
   }
+}
+
+function renderProjects(projects) {
+  const container = document.getElementById('projects-container');
+  if (!container) return;
+
+  if (!projects || projects.length === 0) {
+    container.innerHTML = '<div class="empty">Список проектов пуст 🎉</div>';
+    return;
+  }
+
+  // Фильтруем просроченные проекты (устойчиво к регистру символов)
+  const activeProjects = projects.filter(p => {
+    const status = String(p.Status || p.status || '').toLowerCase();
+    return status !== 'expired' && status !== 'archived';
+  });
+
+  if (activeProjects.length === 0) {
+    container.innerHTML = '<div class="empty">Активных проектов пока нет.</div>';
+    return;
+  }
+
+  container.innerHTML = activeProjects.map(item => {
+    // Безопасное считывание полей (с фоллбэками на случай разного регистра в Google Таблице)
+    const name = item.Project_Name || item.project_name || item.Name || 'Без названия';
+    const subject = item.Subject || item.subject || 'Предмет не указан';
+    const maxCap = Number(item.Max_Capacity || item.max_capacity || 0);
+    const curCount = Number(item.Current_Count || item.current_count || 0);
+    const membersRaw = item.Members || item.members || '';
+    const members = membersRaw ? String(membersRaw).split(',').join(', ') : 'Участников пока нет';
+    const deadline = item.Deadline || item.deadline || 'Без дедлайна';
+
+    const isFull = curCount >= maxCap && maxCap > 0;
+
+    return `
+      <div class="project-card ${isFull ? 'full-card' : ''}">
+        <div class="card-header">
+          <span class="badge-subject">${escapeHtml(subject)}</span>
+          <span class="badge-capacity ${isFull ? 'full-badge' : ''}">
+            👥 ${curCount} / ${maxCap} мест
+          </span>
+        </div>
+        
+        <h3 class="project-title">${escapeHtml(name)}</h3>
+        
+        <div class="project-members">
+          <small>Участники:</small>
+          <p>${escapeHtml(members)}</p>
+        </div>
+
+        <div class="card-footer">
+          <span>📅 Дедлайн: <strong>${escapeHtml(deadline)}</strong></span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 
   function projectSkeletons() {
     return [1,2,3].map(function () {
