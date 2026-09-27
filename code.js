@@ -10,7 +10,7 @@ const WEB_APP_TELEGRAM_LINK = 'https://lssmlbb1-design.github.io/class-hub/';
 const SPREADSHEET_ID = '1ygTKJmW_9GWwPspc1RY2yJjvfI8WT5XsFf2NNZuAT_M';
 
 // Your deployed /exec URL
-const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxAax1YT_NhP4Vmeyu1mpZyw_0xj0XToSERkN9Gew4ZymAa-s24KvvNm6rZoT8unAl76g/exec';
+const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzvsZtUmFA2ht_AwXTqShWZqwuN_l-acb5bU8WCG5poymUXezFuMOwSGx85tXaCAWyOKA/exec';
 
 // Optional shared secret
 const WEBHOOK_SECRET = '1234899384';
@@ -146,42 +146,35 @@ function jsonResponse(obj) {
 // ============================================================
 
 function doPost(e) {
-  // Telegram ОБЯЗАН сразу получить 200 OK в формате JSON, 
-  // чтобы у него не возникало ошибки 302 Found
-  const output = ContentService.createTextOutput(JSON.stringify({ ok: true }))
+  // ТЕЛЕГРАМ ТРЕБУЕТ STRICT { ok: true }
+  const responseOK = ContentService.createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
 
   try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return output;
-    }
+    if (!e || !e.postData || !e.postData.contents) return responseOK;
 
     const data = JSON.parse(e.postData.contents);
 
-    // 1. Обработка кнопок из Telegram
-    if (data.callback_query) {
-      try {
-        handleInviteCallback(data.callback_query);
-      } catch (cbErr) {
-        Logger.log('❌ Ошибка в handleInviteCallback: ' + cbErr.toString());
-      }
-    } 
-    // 2. Обработка сообщений из чата
-    else if (data.message) {
-      try {
-        handleTextMessage(data.message);
-      } catch (msgErr) {
-        Logger.log('❌ Ошибка в handleTextMessage: ' + msgErr.toString());
-      }
+    // 1. Форма создания проекта с сайта
+    if (data.action === 'addProject') {
+      handleAddProject(data);
+      return responseOK;
     }
 
-  } catch (globalErr) {
-    Logger.log('❌ Ошибка парсинга doPost: ' + globalErr.toString());
+    // 2. Нажатие инлайн-кнопок в Telegram
+    if (data.callback_query) {
+      handleInviteCallback(data.callback_query);
+    } 
+    // 3. Сообщения в чате/группе Telegram
+    else if (data.message) {
+      handleTextMessage(data.message);
+    }
+
+  } catch (err) {
+    Logger.log('❌ doPost Error: ' + err.toString());
   }
 
-  // Всегда возвращаем валидный JSON!
-  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
-  .setMimeType(ContentService.MimeType.JSON);
+  return responseOK;
 }
 
 // ============================================================
@@ -537,16 +530,15 @@ function answerCallback(callbackQueryId, text, showAlert) {
 // ============================================================
 
 function setupWebhook() {
-  // Берём прямую чистую ссылку на Deployment
-  const webAppUrl = 'https://script.google.com/macros/s/AKfycbxAax1YT_NhP4Vmeyu1mpZyw_0xj0XToSERkN9Gew4ZymAa-s24KvvNm6rZoT8unAl76g/exec';
+  const url = WEBHOOK_URL.trim();
   
-  // 1. Сбрасываем старый зависший вебхук
+  // 1. Сбрасываем старый вебхук и удаляем застрявшие сообщения
   UrlFetchApp.fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/deleteWebhook?drop_pending_updates=true');
   
-  // 2. Регистрируем чистый URL без секретных токенов в URL
-  const telegramApiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook?url=' + encodeURIComponent(webAppUrl);
-  
+  // 2. Регистрируем корректный URL
+  const telegramApiUrl = 'https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook?url=' + encodeURIComponent(url);
   const response = UrlFetchApp.fetch(telegramApiUrl);
+  
   Logger.log('Результат установки: ' + response.getContentText());
 }
 
