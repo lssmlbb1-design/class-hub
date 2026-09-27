@@ -73,7 +73,45 @@
     height: 2px; border-radius: 2px;
     background: linear-gradient(90deg, #60A5FA, #34D399);
   }
+  .deadline-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.task-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #0088cc; /* Цвет Telegram */
+  color: #ffffff !important;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 0.2s ease;
+}
+
+.task-link-btn:hover {
+  background-color: #006699;
+}
   .sort-btn {
     transition: all 0.2s ease;
   }
@@ -354,30 +392,51 @@
     return '<span class="text-[11px] font-semibold px-2 py-1 rounded-lg ' + cls + '">' + escapeHTML(type || 'Дедлайн') + '</span>';
   }
 
-  function renderDeadlines() {
-    const list = document.getElementById('deadlines-list');
-    if (!state.schedule.length) { list.innerHTML = emptyState('Дедлайнов пока нет 🎉'); return; }
+  function renderDeadlines(deadlines) {
+  const container = document.getElementById('deadlines-container'); // или ваш ID контейнера
+  if (!container) return;
 
-    let sorted = state.schedule.slice();
+  if (!deadlines || deadlines.length === 0) {
+    container.innerHTML = '<div class="empty-state">Дедлайнов пока нет 🎉</div>';
+    return;
+  }
 
-    // Логика трех видов сортировки
-    if (currentSort === 'date') {
-      sorted.sort(function (a, b) {
-        return new Date(a.Date || a.date).getTime() - new Date(b.Date || b.date).getTime();
-      });
-    } else if (currentSort === 'credits') {
-      sorted.sort(function (a, b) {
-        const cA = Number(a.Credits || a.credits || a.Кредиты || 0);
-        const cB = Number(b.Credits || b.credits || b.Кредиты || 0);
-        return cB - cA;
-      });
-    } else if (currentSort === 'points') {
-      sorted.sort(function (a, b) {
-        const pA = Number(a.Points || a.points || a.Баллы || 0);
-        const pB = Number(b.Points || b.points || b.Баллы || 0);
-        return pB - pA;
-      });
-    }
+  container.innerHTML = deadlines.map(item => {
+    // Получаем ссылку из любого возможного поля таблицы
+    const taskLink = item.Link || item.Telegram_Msg_Link || item.link || '';
+    
+    // Формируем HTML для кнопки, если ссылка присутствует
+    const linkButtonHtml = taskLink 
+      ? `<a href="${taskLink}" target="_blank" class="task-link-btn">
+          <span>🔗</span> Открыть задание в Telegram
+         </a>` 
+      : '';
+
+    return `
+      <div class="deadline-card">
+        <div class="card-header">
+          <span class="subject-badge">${escapeHtml(item.Subject || 'Общее')}</span>
+          <span class="type-badge">${escapeHtml(item.Type || 'Дедлайн')}</span>
+        </div>
+        <h3 class="task-title">${escapeHtml(item.Task || item.Task_Description || '')}</h3>
+        
+        <div class="card-footer">
+          <div class="due-date">
+            <span>📅 Сдать до:</span> <strong>${escapeHtml(item.Date || item.Deadline_Date || '')}</strong>
+          </div>
+          ${linkButtonHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Вспомогательная функция для защиты от XSS
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
+}
 
     list.innerHTML = sorted.map(function (item) {
       const dateLabel = formatDate(item.Date || item.date);
