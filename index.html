@@ -179,34 +179,41 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbz.../exec'; // <-- ваш URL Apps Script
-    let currentProjectId = null;
-
-    document.addEventListener('DOMContentLoaded', async () => {
-      await loadProjects();
-      bindModalEvents();
-    });
-
-    async function loadProjects() {
-      try {
-        const response = await fetch(`${GAS_URL}?action=getProjects`, {
-          method: 'GET',
-          mode: 'cors'
-        });
-
-        if (!response.ok) {
-          throw new Error('Ошибка загрузки проектов');
-        }
-
-        const projects = await response.json();
-
-        renderProjects(projects);
-      } catch (error) {
-        console.error(error);
-        document.getElementById('projectsList').innerHTML =
-          '<div class="project-card"><h3>Ошибка</h3><div class=\"meta\">Не удалось загрузить проекты.</div></div>';
+// URL вашего развернутого Google Apps Script
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbwMXejYR6g5kbdsNO_AS5MvUvI_OWRG3M9Z486-AiyImYXUCyCtB9zWm245JpCRvKQIkg/exec"; 
+  
+  // 1. Подача заявки на участие с сайта
+  async function applyForProject(projectId) {
+    const studentId = prompt("Введите ваш Telegram ID (узнать можно у @userinfobot):");
+    if (!studentId) return;
+  
+    const studentName = prompt("Введите ваше Имя / ФИО:");
+    if (!studentName) return;
+  
+    try {
+      const response = await fetch(GAS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "joinProjectRequest",
+          projectId: projectId,
+          studentId: studentId.trim(),
+          studentName: studentName.trim()
+        })
+      });
+  
+      const result = await response.json();
+  
+      if (result.status === "success") {
+        alert("✅ Заявка успешно отправлена лидеру проекта в Telegram!");
+      } else {
+        alert("❌ Ошибка: " + (result.message || "Не удалось отправить заявку."));
       }
+    } catch (err) {
+      alert("❌ Ошибка соединения с сервером.");
+      console.error(err);
     }
+}
 
     function renderProjects(projects) {
       const container = document.getElementById('projectsList');
