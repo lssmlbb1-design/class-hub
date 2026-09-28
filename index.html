@@ -99,6 +99,9 @@
       box-shadow: 0 4px 6px rgba(0,0,0,.07);
       border: 1px solid rgba(0,0,0,.05);
       transition: all .3s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
 
     .card:hover {
@@ -116,42 +119,23 @@
       font-size: 14px;
       color: #718096;
       line-height: 1.6;
-      margin: 8px 0;
+      margin: 6px 0;
     }
 
     .members-box {
       background: #f7fafc;
       border-left: 4px solid #667eea;
-      padding: 12px;
+      padding: 10px;
       border-radius: 6px;
-      margin-top: 16px;
+      margin-top: 12px;
       font-size: 13px;
       color: #4a5568;
     }
 
     .members-box strong {
       display: block;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       color: #2d3748;
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      margin-top: 8px;
-    }
-
-    .status-badge.active {
-      background: #c6f6d5;
-      color: #22543d;
-    }
-
-    .status-badge.expired {
-      background: #fed7d7;
-      color: #742a2a;
     }
 
     .join-btn {
@@ -283,43 +267,21 @@
       opacity: 1;
     }
 
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #718096;
-    }
-
-    .empty-state-icon {
-      font-size: 48px;
-      margin-bottom: 12px;
-    }
-
-    .task-item {
-      padding: 16px;
-      background: #f7fafc;
-      border-left: 4px solid #667eea;
-      margin-bottom: 12px;
+    .link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      color: white;
       border-radius: 6px;
-    }
-
-    .task-item strong {
-      color: #2d3748;
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .task-item .subject {
-      font-size: 12px;
-      color: #a0aec0;
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      margin-bottom: 4px;
-    }
-
-    .task-item .date {
+      text-decoration: none;
       font-size: 13px;
-      color: #667eea;
-      margin-top: 6px;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+
+    .link-btn:hover {
+      opacity: 0.9;
     }
   </style>
 </head>
@@ -371,8 +333,8 @@
 
   <div class="toast" id="toast"></div>
 
-<script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxu61h-85AKMbKXPuMMrEWgdZWetsEKLKTTjZPez_jeRViDmJl64If-TlMCglADwqFY3w/exec";
+  <script>
+    const GAS_URL = "https://class-hub.nureldinmuhamedov010410.workers.dev/";
     let currentProjectId = null;
 
     const $ = (id) => document.getElementById(id);
@@ -380,7 +342,23 @@
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
     }[c]));
 
-    // Функция для безопасного формирования Telegram-ссылки
+    // Универсальная функция получения значения из объекта (без учета регистра ключа)
+    function getVal(obj, ...keys) {
+      if (!obj || typeof obj !== 'object') return '';
+      for (const k of keys) {
+        if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
+      }
+      const objKeys = Object.keys(obj);
+      for (const k of keys) {
+        const lowerK = String(k).toLowerCase();
+        const foundKey = objKeys.find(key => key.toLowerCase() === lowerK);
+        if (foundKey && obj[foundKey] !== undefined && obj[foundKey] !== null && obj[foundKey] !== '') {
+          return obj[foundKey];
+        }
+      }
+      return '';
+    }
+
     function getTelegramUrl(tg) {
       if (!tg) return null;
       const cleanTg = String(tg).trim().replace(/^@/, '');
@@ -460,14 +438,30 @@
         
         const raw = await response.json();
 
-        let projects = [], deadlines = [], syllabus = [];
+        let projects = raw.projects || raw.data || [];
+        let deadlines = raw.deadlines || [];
+        let syllabus = raw.syllabus || [];
 
+        // Если получен массив напрямую
         if (Array.isArray(raw)) {
           projects = raw;
-        } else if (raw.projects || raw.deadlines) {
-          projects = raw.projects || [];
-          deadlines = raw.deadlines || [];
-          syllabus = raw.syllabus || [];
+        }
+
+        // Запасная подгрузка, если вкладка не пришла в едином ответе
+        if (!deadlines.length) {
+          try {
+            const resD = await fetch(`${GAS_URL}?action=getDeadlines`);
+            const dataD = await resD.json();
+            deadlines = dataD.data || dataD.deadlines || [];
+          } catch(e) {}
+        }
+
+        if (!syllabus.length) {
+          try {
+            const resS = await fetch(`${GAS_URL}?action=getSyllabus`);
+            const dataS = await resS.json();
+            syllabus = dataS.data || dataS.syllabus || [];
+          } catch(e) {}
         }
 
         renderProjects(projects);
@@ -482,7 +476,7 @@
       }
     }
 
-    // ===== 1. КАРТОЧКИ ПРОЕКТОВ (С ССЫЛКАМИ) =====
+    // ===== 1. ОТРЕСОВКА ПРОЕКТОВ =====
     function renderProjects(projects) {
       const container = $('projectsList');
       if (!Array.isArray(projects) || projects.length === 0) {
@@ -491,20 +485,20 @@
       }
 
       container.innerHTML = projects.map(p => {
-        const id = p.Project_ID || p.projectId || '';
-        const name = p.Project_Name || p.projectName || 'Без названия';
-        const subject = p.Subject || p.subject || '—';
-        const deadline = p.Deadline || p.deadline || '—';
-        const points = p.Points || p.points || p.Credits || p.credits || '';
-        const maxCap = Number(p.Max_Capacity || p.maxCapacity || 0);
-        const currCount = Number(p.Current_Count || p.currentCount || 1);
+        const id = getVal(p, 'projectId', 'Project_ID', 'id');
+        const name = getVal(p, 'projectName', 'Project_Name', 'name') || 'Без названия';
+        const subject = getVal(p, 'subject', 'Subject', 'Предмет') || '—';
+        const deadline = getVal(p, 'deadline', 'Deadline', 'Срок') || '—';
+        const points = getVal(p, 'points', 'Points', 'Credits', 'credits');
+        const maxCap = Number(getVal(p, 'maxCapacity', 'Max_Capacity')) || 0;
+        const currCount = Number(getVal(p, 'currentCount', 'Current_Count')) || 1;
         const available = Math.max(0, maxCap - currCount);
         
-        const leaderTg = p.Leader_Telegram_ID || p.leaderTelegramId || '';
+        const leaderTg = getVal(p, 'leaderTelegramId', 'Leader_Telegram_ID');
         const tgLink = getTelegramUrl(leaderTg);
-        const projectLink = p.Link || p.link || p.URL || p.url || '';
+        const projectLink = getVal(p, 'link', 'Link', 'url', 'URL');
 
-        let membersRaw = p.Approved_Members || p.approvedMembers || p.Members || '';
+        let membersRaw = getVal(p, 'approvedMembers', 'Approved_Members', 'members');
         let membersArr = Array.isArray(membersRaw) 
           ? membersRaw 
           : String(membersRaw).split(',').map(m => m.trim()).filter(Boolean);
@@ -513,29 +507,32 @@
 
         return `
           <div class="card">
-            <h3>${escape(name)}</h3>
-            <div class="card-meta"><strong>📚 Предмет:</strong> ${escape(subject)}</div>
-            <div class="card-meta"><strong>📅 Дедлайн:</strong> ${escape(deadline)}</div>
-            ${points ? `<div class="card-meta"><strong>🏆 Баллы / Кредиты:</strong> ${escape(points)}</div>` : ''}
-            <div class="card-meta"><strong>👥 Свободно мест:</strong> ${available}/${maxCap}</div>
-            
-            <div class="members-box" style="margin-top: 10px; padding: 8px; background: #f7fafc; border-radius: 6px; font-size: 13px;">
-              <strong>Участники:</strong> ${membersStr}
+            <div>
+              <h3>${escape(name)}</h3>
+              <div class="card-meta"><strong>📚 Предмет:</strong> ${escape(subject)}</div>
+              <div class="card-meta"><strong>📅 Дедлайн:</strong> ${escape(deadline)}</div>
+              ${points ? `<div class="card-meta"><strong>🏆 Баллы / Кредиты:</strong> ${escape(points)}</div>` : ''}
+              <div class="card-meta"><strong>👥 Свободно мест:</strong> ${available}/${maxCap}</div>
+              
+              <div class="members-box">
+                <strong>Участники:</strong> ${membersStr}
+              </div>
             </div>
 
-            <!-- БЛОК ССЫЛОК -->
-            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
-              ${tgLink ? `<a href="${tgLink}" target="_blank" style="padding: 6px 12px; background: #209cee; color: white; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">💬 Лидер в TG</a>` : ''}
-              ${projectLink ? `<a href="${escape(projectLink)}" target="_blank" style="padding: 6px 12px; background: #48bb78; color: white; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">📁 ТЗ / Файлы</a>` : ''}
-            </div>
+            <div>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
+                ${tgLink ? `<a href="${tgLink}" target="_blank" class="link-btn" style="background: #209cee;">💬 Лидер в TG</a>` : ''}
+                ${projectLink ? `<a href="${escape(projectLink)}" target="_blank" class="link-btn" style="background: #48bb78;">📁 ТЗ / Файлы</a>` : ''}
+              </div>
 
-            <button class="join-btn" style="margin-top: 12px;" onclick="currentProjectId='${escape(id)}'; openModal();">Подать заявку</button>
+              <button class="join-btn" onclick="currentProjectId='${escape(id)}'; openModal();">Подать заявку</button>
+            </div>
           </div>
         `;
       }).join('');
     }
 
-    // ===== 2. КАРТОЧКИ ДЕДЛАЙНОВ (С ССЫЛКАМИ) =====
+    // ===== 2. ОТРЕСОВКА ДЕДЛАЙНОВ =====
     function renderDeadlines(deadlines) {
       const container = $('deadlinesList');
       if (!Array.isArray(deadlines) || deadlines.length === 0) {
@@ -543,19 +540,25 @@
         return;
       }
 
-      container.innerHTML = deadlines.slice(0, 20).map(d => {
-        const link = d.Link || d.link || d.URL || d.url || d['Ссылка'] || '';
-        const points = d.Points || d.points || d.Credits || d.credits || d['Баллы'] || '';
+      container.innerHTML = deadlines.map(d => {
+        const subject = getVal(d, 'Subject', 'subject', 'Предмет') || 'Без предмета';
+        const task = getVal(d, 'Task', 'Task_Description', 'task', 'task_description', 'Задание') || '—';
+        const date = getVal(d, 'Date', 'Deadline_Date', 'date', 'deadline_date', 'Срок', 'Дедлайн') || '—';
+        const link = getVal(d, 'Link', 'link', 'URL', 'url', 'Ссылка');
+        const points = getVal(d, 'Points', 'points', 'Credits', 'credits', 'Баллы');
+
         return `
           <div class="card">
-            <h3>${escape(d.Subject || d.subject || d['Предмет'] || 'Без предмета')}</h3>
-            <div class="card-meta"><strong>Задание:</strong> ${escape(d.Task || d.Task_Description || d.task || d['Задание'] || '—')}</div>
-            <div class="card-meta"><strong>📅 До:</strong> ${escape(d.Date || d.Deadline_Date || d.date || d['Срок'] || '—')}</div>
-            ${points ? `<div class="card-meta"><strong>🏆 Баллы / Кредиты:</strong> ${escape(points)}</div>` : ''}
-            
+            <div>
+              <h3>${escape(subject)}</h3>
+              <div class="card-meta"><strong>Задание:</strong> ${escape(task)}</div>
+              <div class="card-meta"><strong>📅 Срок:</strong> ${escape(date)}</div>
+              ${points ? `<div class="card-meta"><strong>🏆 Баллы / Кредиты:</strong> ${escape(points)}</div>` : ''}
+            </div>
+
             ${link ? `
-              <div style="margin-top: 14px;">
-                <a href="${escape(link)}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: #667eea; color: white; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; transition: background 0.2s;">
+              <div style="margin-top: 16px;">
+                <a href="${escape(link)}" target="_blank" class="link-btn" style="background: #667eea; width: 100%; justify-content: center;">
                   🔗 Открыть задание
                 </a>
               </div>
@@ -565,31 +568,40 @@
       }).join('');
     }
 
-    // ===== 3. КАРТОЧКИ СИЛЛАБУСА (С ССЫЛКАМИ) =====
+    // ===== 3. ОТРЕСОВКА СИЛЛАБУСА =====
     function renderSyllabus(syllabus) {
       const container = $('syllabusList');
       if (!Array.isArray(syllabus) || syllabus.length === 0) {
-        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #a0aec0;"><div style="font-size: 48px; margin-bottom: 12px;">📚</div>Силлабус не заполнен</div>';
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #a0aec0;"><div style="font-size: 48px; margin-bottom: 12px;">📚</div>Силлабус пока не заполнен</div>';
         return;
       }
 
-      container.innerHTML = syllabus.slice(0, 20).map(s => {
-        const link = s.Link || s.link || s.URL || s.url || s['Ссылка'] || '';
+      container.innerHTML = syllabus.map(s => {
+        const subject = getVal(s, 'Subject', 'subject', 'Предмет') || 'Без названия';
+        const title = getVal(s, 'Title', 'title', 'Topic', 'topic', 'Тема') || 'Силлабус';
+        const instructor = getVal(s, 'Instructor', 'instructor', 'Преподаватель');
+        const link = getVal(s, 'Link', 'link', 'URL', 'url', 'Ссылка');
+
         return `
           <div class="card">
-            <h3>${escape(s.Subject || s.subject || s['Предмет'] || 'Без названия')}</h3>
-            <div class="card-meta"><strong>Тема:</strong> ${escape(s.Topic || s.Theme || s.theme || s['Тема'] || '—')}</div>
-            ${link ? `
-              <div style="margin-top: 14px;">
-                <a href="${escape(link)}" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: #ED8936; color: white; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;">
-                  📚 Материалы лекции
-                </a>
-              </div>
-            ` : ''}
+            <div>
+              <h3>${escape(subject)}</h3>
+              <div class="card-meta"><strong>Описание:</strong> ${escape(title)}</div>
+              ${instructor ? `<div class="card-meta"><strong>👤 Преподаватель:</strong> ${escape(instructor)}</div>` : ''}
+            </div>
+
+            <div style="margin-top: 16px;">
+              ${link 
+                ? `<a href="${escape(link)}" target="_blank" class="link-btn" style="background: #ED8936; width: 100%; justify-content: center;">📖 Открыть силлабус</a>`
+                : `<span style="font-size: 13px; color: #a0aec0;">Ссылка временно отсутствует</span>`
+              }
+            </div>
           </div>
         `;
       }).join('');
     }
 
     loadAllData();
-</script>
+  </script>
+</body>
+</html>
